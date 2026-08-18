@@ -33,7 +33,7 @@ dirgest -d . -s --mock
 dirgest --help
 ```
 
-The result header shows the detected project name and scanned directory. In an interactive terminal, suggestions open in an OpenTUI browser: use arrow keys or `j`/`k` to preview, Enter or `1` through `6` to choose, `a` to print all prompts, or `q` to leave. With redirected/non-interactive input, dirgest prints the suggestion list and exits without waiting for input.
+The result header shows the detected project name and scanned directory. In an interactive terminal, suggestions open in an OpenTUI browser: use arrow keys or `j`/`k` to preview, Enter or `1` through `6` to choose, `a` to print all prompts, or `q` to leave. The browser requires Node.js 26.4 or later; dirgest automatically enables the required FFI flag and falls back to the basic picker on older Node versions. With redirected/non-interactive input, dirgest prints the suggestion list and exits without waiting for input.
 
 `--suggest` (and the legacy `--suggestions`) produces balanced, product-next ideas. Add `growth` for activation, retention, and monetization ideas; `ux` for friction and experience improvements; `technical` for architecture, debt, and reliability work; or `wild` for novel adjacent capabilities grounded in the current project.
 

@@ -2,9 +2,20 @@
 
 import path from 'node:path';
 import process from 'node:process';
+import { spawnSync } from 'node:child_process';
 import { inspectProject, getAskResponse, getSuggestions, readHistory, writeHistory, clearHistory } from '@dirgest/sdk';
 import { promptForSelection } from '../lib/selection.js';
 import { browseSuggestions, renderAskResponse, renderError, renderHeader, renderHistory, renderPrompts, renderSuggestions } from '../lib/ui.js';
+
+const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number);
+const canUseOpenTui = nodeMajor > 26 || (nodeMajor === 26 && nodeMinor >= 4);
+const runsSuggestionCommand = process.argv.slice(2).some((argument) => argument === '-s' || argument === '--suggest' || argument === '--suggestions');
+
+// OpenTUI's native renderer needs Node's experimental FFI flag. Re-exec only when it is supported.
+if (canUseOpenTui && runsSuggestionCommand && !process.execArgv.includes('--experimental-ffi')) {
+  const result = spawnSync(process.execPath, ['--experimental-ffi', ...process.execArgv, process.argv[1], ...process.argv.slice(2)], { stdio: 'inherit' });
+  process.exit(result.status ?? 1);
+}
 
 const help = `dirgest - context-aware project feature suggestions
 
@@ -112,8 +123,11 @@ async function main() {
       if (process.stdin.isTTY && process.stdout.isTTY) {
         try {
           choice = await browseSuggestions(suggestions, project);
-        } catch {
-          process.stderr.write(`${renderError('OpenTUI could not start; using the basic terminal picker instead.')}\n`);
+        } catch (error) {
+          const message = error.message?.includes('native FFI is not available')
+            ? `OpenTUI requires Node 26.4+; current runtime is ${process.version}. Using the basic terminal picker instead.`
+            : 'OpenTUI could not start; using the basic terminal picker instead.';
+          process.stderr.write(`${renderError(message)}\n`);
           choice = await promptForSelection(process.stdin, process.stdout, { interactive: true, count: suggestions.length });
         }
       } else {
