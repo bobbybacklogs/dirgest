@@ -1,6 +1,6 @@
 {
   "name": "@dirgest/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Context-aware project feature suggestions CLI",
   "type": "module",
   "license": "MIT",
@@ -21,7 +21,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@dirgest/sdk": "0.1.0",
+    "@dirgest/sdk": "0.1.1",
     "@opentui/core": "^0.5.4"
   }
 }
