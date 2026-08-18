@@ -1,0 +1,27 @@
+{
+  "name": "@dirgest/cli",
+  "version": "0.1.0",
+  "description": "Context-aware project feature suggestions CLI",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "dirgest": "./bin/dirgest.js"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@dirgest/sdk": "0.1.0",
+    "@opentui/core": "^0.5.4"
+  }
+}

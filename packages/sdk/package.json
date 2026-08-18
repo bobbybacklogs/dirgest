@@ -1,0 +1,27 @@
+{
+  "name": "@dirgest/sdk",
+  "version": "0.1.0",
+  "description": "Context-aware project suggestion engine",
+  "type": "module",
+  "exports": {
+    ".": "./lib/index.js",
+    "./types": "./lib/types.js",
+    "./lib/*": "./lib/*"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "modelhitch": "0.14.0"
+  },
+  "files": [
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT"
+}

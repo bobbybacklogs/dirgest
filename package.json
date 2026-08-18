@@ -1,18 +1,17 @@
 {
-  "name": "dirgest",
-  "version": "0.1.0",
-  "description": "Context-aware local project feature suggestions",
+  "name": "dirgest-monorepo",
+  "private": true,
   "type": "module",
-  "bin": {
-    "dirgest": "./bin/dirgest.js"
-  },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "test": "node --test"
+    "test": "npm test --workspaces",
+    "dev": "node scripts/dev.js",
+    "dev:api": "node packages/api/bin/server.js",
+    "dev:web": "npm run dev --workspace=packages/web"
   },
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "modelhitch": "0.14.0"
   }
 }
