@@ -135,7 +135,7 @@ async function main() {
       }
       if (choice === 'all') process.stdout.write(`\n${renderPrompts(suggestions)}\n`);
       if (typeof choice === 'number') {
-        process.stdout.write(`\n${renderPrompts([suggestions[choice]])}\n`);
+        process.stdout.write(`\n${renderPrompts([suggestions[choice]], choice)}\n`);
         await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestions[choice].title });
       }
     }

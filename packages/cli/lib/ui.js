@@ -6,7 +6,7 @@ export function renderHeader(project) {
   return `\n${color(ANSI.bold + ANSI.cyan, project.name)} ${color(ANSI.dim, '|')} ${color(ANSI.dim, project.directory)}\n${color(ANSI.dim, context)}`;
 }
 export function renderSuggestions(suggestions) { return `\n${suggestions.map((suggestion, index) => `  ${color(ANSI.green, String(index + 1).padStart(2, ' '))}  ${color(ANSI.bold, suggestion.title)}`).join('\n')}\n\n${color(ANSI.dim, 'Choose 1-6 for a full coding prompt, a for all prompts, q to exit.')}`; }
-export function renderPrompts(suggestions) { return suggestions.map((suggestion, index) => `${color(ANSI.bold + ANSI.cyan, `${index + 1}. ${suggestion.title}`)}\n${suggestion.prompt}`).join('\n\n'); }
+export function renderPrompts(suggestions, startIndex = 0) { return suggestions.map((suggestion, index) => `${color(ANSI.bold + ANSI.cyan, `${startIndex + index + 1}. ${suggestion.title}`)}\n${suggestion.prompt}`).join('\n\n'); }
 export function renderError(message) { return color(ANSI.red, `dirgest: ${message}`); }
 
 export function renderAskResponse(response, question) {
