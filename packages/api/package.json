@@ -1,11 +1,11 @@
 {
   "name": "@dirgest/api",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Dirgest API server",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "dirgest-api": "./bin/server.js"
+    "dirgest-api": "bin/server.js"
   },
   "files": [
     "bin",
