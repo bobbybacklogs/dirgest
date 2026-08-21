@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { MAX_FEATURES, MAX_FEATURE_FILE_BYTES, parseFeatureFile, parseFeatureList, readFeatureFile, reviewFeatures, validateFeatureReview } from '@dirgest/sdk/lib/features.js';
+import { MAX_FEATURES, MAX_FEATURE_FILE_BYTES, parseFeatureFile, parseFeatureList, readFeatureFile, reviewFeatures, splitFeatureEntry, validateFeatureReview } from '@dirgest/sdk/lib/features.js';
 
 const project = { name: 'dirgest', directory: os.tmpdir() };
 const prompt = 'Implement this feature while preserving the existing architecture, adding meaningful validation, handling errors, and testing the finished user-facing workflow.';
@@ -24,6 +24,30 @@ test('parseFeatureFile falls back to plain lines for unstructured txt files', ()
 
 test('parseFeatureFile strips inline markdown emphasis, links, and code spans', () => {
   assert.deepEqual(parseFeatureFile('- **Add dark mode** using `prefers-color-scheme`\n- [Billing docs](https://example.com) integration work'), ['Add dark mode using prefers-color-scheme', 'Billing docs integration work']);
+});
+
+test('splitFeatureEntry splits "Name - description" style entries and leaves plain text alone', () => {
+  assert.deepEqual(splitFeatureEntry('Dark mode - respect prefers-color-scheme'), { name: 'Dark mode', description: 'respect prefers-color-scheme' });
+  assert.deepEqual(splitFeatureEntry('Dark mode \u2013 respect prefers-color-scheme'), { name: 'Dark mode', description: 'respect prefers-color-scheme' });
+  assert.deepEqual(splitFeatureEntry('Dark mode \u2014 respect prefers-color-scheme'), { name: 'Dark mode', description: 'respect prefers-color-scheme' });
+  assert.deepEqual(splitFeatureEntry('Dark mode: respect prefers-color-scheme'), { name: 'Dark mode', description: 'respect prefers-color-scheme' });
+  assert.deepEqual(splitFeatureEntry('Add dark mode toggle'), { name: 'Add dark mode toggle', description: '' });
+  assert.deepEqual(splitFeatureEntry('Real-time collaboration'), { name: 'Real-time collaboration', description: '' });
+});
+
+test('parseFeatureFile normalizes "Name - desc" style entries to a consistent em-dash shape', () => {
+  const features = parseFeatureFile(['* Dark mode - respect prefers-color-scheme', '1. Stripe billing: charge on upgrade', '- Offline cache \u2013 cache scanned projects locally', '- Add dark mode toggle'].join('\n'));
+  assert.deepEqual(features, [
+    'Dark mode \u2014 respect prefers-color-scheme',
+    'Stripe billing \u2014 charge on upgrade',
+    'Offline cache \u2014 cache scanned projects locally',
+    'Add dark mode toggle'
+  ]);
+});
+
+test('parseFeatureFile dedupes entries that only differ by separator style', () => {
+  const features = parseFeatureFile('- Dark mode - respect prefers-color-scheme\n- Dark mode: respect prefers-color-scheme\n');
+  assert.deepEqual(features, ['Dark mode \u2014 respect prefers-color-scheme']);
 });
 
 test('parseFeatureList enforces the empty and maximum feature limits', () => {

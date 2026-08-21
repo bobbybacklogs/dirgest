@@ -17,6 +17,7 @@ const LIST_MARKER = /^\s*(?:[-*+]|\d+[.)])\s+/;
 const HEADING_MARKER = /^\s*#{1,6}\s+/;
 const CHECKBOX = /^\[[ xX]\]\s*/;
 const ACTION_VERB = /\b(add|implement|create|build|fix|improve|enhance|update|refactor|support|introduce|enable)\b/;
+const NAME_DESCRIPTION_SEPARATOR = /^(.{2,80}?)(?:\s+[-\u2013\u2014]\s+|:\s+)(\S.{2,})$/;
 
 const REVIEW_SCHEMA = {
   type: 'object',
@@ -58,6 +59,25 @@ function normalizeFeature(text) {
 }
 
 /**
+ * Split a "Name - description", "Name: description", or em/en-dash variant into its parts.
+ * Returns the original text as `name` with an empty `description` when no separator is found.
+ */
+export function splitFeatureEntry(text) {
+  const match = text.match(NAME_DESCRIPTION_SEPARATOR);
+  if (!match) return { name: text.trim(), description: '' };
+  return { name: match[1].trim(), description: match[2].trim() };
+}
+
+/**
+ * Normalize a raw feature line into a single canonical "Name \u2014 description" shape so mixed
+ * separator styles ("-", ":", "\u2013", "\u2014") in the same file read as one consistent format.
+ */
+function normalizeFeatureText(text) {
+  const { name, description } = splitFeatureEntry(text);
+  return description ? `${name} \u2014 ${description}` : name;
+}
+
+/**
  * Extract one feature per line item from a `.md` or `.txt` document. When the document uses
  * headings or list markers, only those lines are treated as features so surrounding prose is ignored.
  */
@@ -84,10 +104,11 @@ export function parseFeatureFile(content) {
   const features = [];
   for (const { text } of selected) {
     if (text.length < MIN_FEATURE_LENGTH) continue;
-    const key = normalizeFeature(text);
+    const normalized = normalizeFeatureText(text);
+    const key = normalizeFeature(normalized);
     if (seen.has(key)) continue;
     seen.add(key);
-    features.push(text.length > MAX_FEATURE_LENGTH ? `${text.slice(0, MAX_FEATURE_LENGTH - 1).trimEnd()}…` : text);
+    features.push(normalized.length > MAX_FEATURE_LENGTH ? `${normalized.slice(0, MAX_FEATURE_LENGTH - 1).trimEnd()}\u2026` : normalized);
   }
   return features;
 }
