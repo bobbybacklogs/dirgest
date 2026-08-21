@@ -469,6 +469,12 @@ body {
   gap: 0;
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -483,6 +489,8 @@ body {
   border-top: none;
   border-left: none;
   border-right: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab:hover {
