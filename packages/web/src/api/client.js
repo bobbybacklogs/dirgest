@@ -30,6 +30,12 @@ export async function askQuestion(id, question, mock = false) {
         body: JSON.stringify({ question, mock }),
     });
 }
+export async function reviewFeatures(id, content, filename, mock = false) {
+    return request(`/api/v1/projects/${id}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ content, filename, mock }),
+    });
+}
 export async function getHistory(id) {
     return request(`/api/v1/projects/${id}/history`);
 }

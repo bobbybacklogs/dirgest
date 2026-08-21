@@ -1,6 +1,6 @@
 {
   "name": "@dirgest/api",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Dirgest API server",
   "type": "module",
   "license": "MIT",
@@ -20,14 +20,14 @@
     "test": "node --test",
     "start": "node ./bin/server.js",
     "build:web": "cd ../web && npm run build",
-    "copy:web": "node -e \"require('fs').cpSync('../web/dist','./dist',{recursive:true})\"",
+    "copy:web": "node -e \"const fs=require('fs');fs.rmSync('./dist',{recursive:true,force:true});fs.cpSync('../web/dist','./dist',{recursive:true})\"",
     "prepublishOnly": "npm run build:web && npm run copy:web"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "@dirgest/sdk": "0.1.1",
+    "@dirgest/sdk": "0.2.0",
     "@hono/node-server": "^1.14.0",
     "hono": "^4.7.0"
   }

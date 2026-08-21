@@ -5,6 +5,7 @@ import { ProjectUpload } from './components/ProjectUpload';
 import { ProjectView } from './components/ProjectView';
 import { SuggestionPanel } from './components/SuggestionPanel';
 import { AskPanel } from './components/AskPanel';
+import { ReviewPanel } from './components/ReviewPanel';
 import { HistoryPanel } from './components/HistoryPanel';
 export function App() {
     const [project, setProject] = useState(null);
@@ -12,6 +13,7 @@ export function App() {
     const [suggestions, setSuggestions] = useState([]);
     const [activeMode, setActiveMode] = useState('balanced');
     const [askResponse, setAskResponse] = useState(null);
+    const [review, setReview] = useState(null);
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(null);
     const [toast, setToast] = useState(null);
@@ -29,6 +31,7 @@ export function App() {
             setProject({ id: result.id, context: result.context });
             setSuggestions([]);
             setAskResponse(null);
+            setReview(null);
             setTab('understand');
         }
         catch (err) {
@@ -65,6 +68,21 @@ export function App() {
         }
         catch (err) {
             showToast(err instanceof Error ? err.message : 'Failed to evaluate');
+        }
+        finally {
+            setLoading(null);
+        }
+    }, [project, showToast]);
+    const handleReviewFeatures = useCallback(async (content, filename) => {
+        if (!project)
+            return;
+        setLoading(`Reviewing ${filename}\u2026`);
+        try {
+            const result = await api.reviewFeatures(project.id, content, filename, true);
+            setReview(result.review);
+        }
+        catch (err) {
+            showToast(err instanceof Error ? err.message : 'Failed to review features');
         }
         finally {
             setLoading(null);
@@ -110,10 +128,11 @@ export function App() {
         setProject(null);
         setSuggestions([]);
         setAskResponse(null);
+        setReview(null);
         setHistory([]);
         setTab('understand');
     }, []);
-    return (_jsxs("div", { className: "app", children: [_jsxs("header", { className: "header", children: [_jsx("h1", { children: "Dirgest" }), _jsx("p", { children: "Context-aware project suggestions" })] }), loading && (_jsxs("div", { className: "status-bar", children: [_jsx("div", { className: "spinner" }), loading] })), !project ? (_jsx(ProjectUpload, { onUpload: handleUpload })) : (_jsxs(_Fragment, { children: [_jsxs("div", { className: "tabs", children: [['understand', 'suggest', 'ask', 'history'].map((t) => (_jsx("button", { className: `tab ${tab === t ? 'active' : ''}`, onClick: () => {
+    return (_jsxs("div", { className: "app", children: [_jsxs("header", { className: "header", children: [_jsx("h1", { children: "Dirgest" }), _jsx("p", { children: "Context-aware project suggestions" })] }), loading && (_jsxs("div", { className: "status-bar", children: [_jsx("div", { className: "spinner" }), loading] })), !project ? (_jsx(ProjectUpload, { onUpload: handleUpload })) : (_jsxs(_Fragment, { children: [_jsxs("div", { className: "tabs", children: [['understand', 'suggest', 'ask', 'review', 'history'].map((t) => (_jsx("button", { className: `tab ${tab === t ? 'active' : ''}`, onClick: () => {
                                     setTab(t);
                                     if (t === 'history')
                                         handleLoadHistory();
@@ -123,5 +142,7 @@ export function App() {
                                         ? 'Suggestions'
                                         : t === 'ask'
                                             ? 'Ask'
-                                            : 'History' }, t))), _jsx("button", { className: "tab", onClick: handleReset, style: { marginLeft: 'auto' }, children: "New project" })] }), tab === 'understand' && (_jsx(ProjectView, { context: project.context, onGenerateSuggestions: handleGenerateSuggestions })), tab === 'suggest' && (_jsx(SuggestionPanel, { suggestions: suggestions, activeMode: activeMode, onGenerate: handleGenerateSuggestions, onRecord: handleRecordSelection })), tab === 'ask' && (_jsx(AskPanel, { response: askResponse, onAsk: handleAsk })), tab === 'history' && (_jsx(HistoryPanel, { history: history, onClear: handleClearHistory }))] })), toast && _jsx("div", { className: "toast", children: toast })] }));
+                                            : t === 'review'
+                                                ? 'Review list'
+                                                : 'History' }, t))), _jsx("button", { className: "tab", onClick: handleReset, style: { marginLeft: 'auto' }, children: "New project" })] }), tab === 'understand' && (_jsx(ProjectView, { context: project.context, onGenerateSuggestions: handleGenerateSuggestions })), tab === 'suggest' && (_jsx(SuggestionPanel, { suggestions: suggestions, activeMode: activeMode, onGenerate: handleGenerateSuggestions, onRecord: handleRecordSelection })), tab === 'ask' && (_jsx(AskPanel, { response: askResponse, onAsk: handleAsk })), tab === 'review' && (_jsx(ReviewPanel, { review: review, onReview: handleReviewFeatures })), tab === 'history' && (_jsx(HistoryPanel, { history: history, onClear: handleClearHistory }))] })), toast && _jsx("div", { className: "toast", children: toast })] }));
 }
