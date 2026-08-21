@@ -1,5 +1,5 @@
 export { inspectProject, buildProjectContext, filePriority, sortByPriority, detectLanguage, detectFramework, findEntryPoints, summarizeDependencies, detectProjectType, detectProjectSummary, isSourceFile, MAX_FILES, MAX_FILE_BYTES, MAX_SAMPLE_CHARS, CRAWL_MAX_FILES, CRAWL_MAX_DISCOVERED_FILES, CRAWL_MAX_SAMPLE_CHARS, IGNORED_DIRECTORIES, IGNORED_FILES } from './scanner.js';
 export { getSuggestions, getAskResponse, validateSuggestions, validateAskResponse, resolveBridgeConfiguration, bridgeModelCandidates, resolveModelConfiguration, isRetryableModelError, attemptWithCandidateModels } from './suggestions.js';
-export { reviewFeatures, readFeatureFile, parseFeatureFile, parseFeatureList, splitFeatureEntry, validateFeatureReview, FEATURE_FILE_EXTENSIONS, MAX_FEATURE_FILE_BYTES, MAX_FEATURES } from './features.js';
+export { reviewFeatures, readFeatureFile, parseFeatureFile, parseFeatureList, splitFeatureEntry, dedupeFeatures, validateFeatureReview, FEATURE_FILE_EXTENSIONS, MAX_FEATURE_FILE_BYTES, MAX_FEATURES } from './features.js';
 export { readHistory, writeHistory, clearHistory, historyPath, formatHistoryForPrompt } from './history.js';
 export { parseSelection } from './selection-internal.js';

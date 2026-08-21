@@ -207,6 +207,14 @@ test('POST /projects/:id/review accepts a features array', async () => {
   assert.equal(data.review.total, 1);
 });
 
+test('POST /projects/:id/review dedupes a features array before reviewing', async () => {
+  const id = await uploadProject();
+  const res = await req('POST', `/api/v1/projects/${id}/review`, { features: ['Add dark mode toggle', 'add dark mode toggle', ' Add dark mode toggle. '], mock: true });
+  assert.equal(res.status, 200);
+  const { data } = await res.json();
+  assert.equal(data.review.total, 1);
+});
+
 test('POST /projects/:id/review rejects unsupported file types, missing input, and oversized content', async () => {
   const id = await uploadProject();
   const badType = await req('POST', `/api/v1/projects/${id}/review`, { content: '- Add dark mode toggle', filename: 'features.json', mock: true });

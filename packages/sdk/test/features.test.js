@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { MAX_FEATURES, MAX_FEATURE_FILE_BYTES, parseFeatureFile, parseFeatureList, readFeatureFile, reviewFeatures, splitFeatureEntry, validateFeatureReview } from '@dirgest/sdk/lib/features.js';
+import { MAX_FEATURES, MAX_FEATURE_FILE_BYTES, dedupeFeatures, parseFeatureFile, parseFeatureList, readFeatureFile, reviewFeatures, splitFeatureEntry, validateFeatureReview } from '@dirgest/sdk/lib/features.js';
 
 const project = { name: 'dirgest', directory: os.tmpdir() };
 const prompt = 'Implement this feature while preserving the existing architecture, adding meaningful validation, handling errors, and testing the finished user-facing workflow.';
@@ -109,7 +109,23 @@ test('mock feature review splits fits from misfits and produces full coding prom
   assert.ok(review.misfits[0].alternative.length >= 80);
 });
 
+test('dedupeFeatures trims, drops blanks, and collapses case/punctuation/whitespace variants', () => {
+  assert.deepEqual(
+    dedupeFeatures(['Add dark mode toggle', '  add dark mode toggle.  ', 'ADD DARK MODE TOGGLE', '', '   ', 'Implement Stripe billing', 'Implement   Stripe billing']),
+    ['Add dark mode toggle', 'Implement Stripe billing']
+  );
+});
+
+test('reviewFeatures dedupes the list before it is ever sent to the model', async () => {
+  const review = await reviewFeatures(project, ['Add dark mode toggle', 'add dark mode toggle', 'Add dark mode toggle.', 'A vague aspiration about the future'], { mock: true, source: 'features.md' });
+  assert.equal(review.total, 2);
+  assert.equal(review.fits.length, 1);
+  assert.equal(review.fits[0].feature, 'Add dark mode toggle');
+  assert.equal(review.misfits.length, 1);
+});
+
 test('reviewFeatures rejects empty and oversized feature lists', async () => {
   await assert.rejects(reviewFeatures(project, [], { mock: true }), /At least one feature is required/);
+  await assert.rejects(reviewFeatures(project, ['   ', ''], { mock: true }), /At least one feature is required/);
   await assert.rejects(reviewFeatures(project, Array.from({ length: MAX_FEATURES + 1 }, (_, index) => `Add capability ${index}`), { mock: true }), new RegExp(`the limit is ${MAX_FEATURES}`));
 });

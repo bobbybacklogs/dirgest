@@ -59,6 +59,25 @@ function normalizeFeature(text) {
 }
 
 /**
+ * Trim and de-duplicate a feature list (case/whitespace/trailing-punctuation insensitive),
+ * keeping the first occurrence of each. Runs before any model call so duplicate entries from
+ * a caller-supplied `features` array are never sent to or scored by the model twice.
+ */
+export function dedupeFeatures(features) {
+  const seen = new Set();
+  const deduped = [];
+  for (const raw of features) {
+    const feature = String(raw ?? '').trim();
+    if (!feature) continue;
+    const key = normalizeFeature(feature);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(feature);
+  }
+  return deduped;
+}
+
+/**
  * Split a "Name - description", "Name: description", or em/en-dash variant into its parts.
  * Returns the original text as `name` with an empty `description` when no separator is found.
  */
@@ -254,8 +273,10 @@ function summarize(reviews, source) {
  */
 export async function reviewFeatures(project, features, { mock = false, environment = process.env, source } = {}) {
   if (!Array.isArray(features) || features.length === 0) throw new Error('At least one feature is required.');
-  if (features.length > MAX_FEATURES) throw new Error(`Received ${features.length} features; the limit is ${MAX_FEATURES}.`);
-  if (mock) return summarize(mockFeatureReview(project, features), source);
+  const deduped = dedupeFeatures(features);
+  if (deduped.length === 0) throw new Error('At least one feature is required.');
+  if (deduped.length > MAX_FEATURES) throw new Error(`Received ${deduped.length} features; the limit is ${MAX_FEATURES}.`);
+  if (mock) return summarize(mockFeatureReview(project, deduped), source);
 
   const history = await readHistory(project.directory);
   const historyContext = formatHistoryForPrompt(history);
@@ -265,7 +286,7 @@ export async function reviewFeatures(project, features, { mock = false, environm
   try {
     const reviews = [];
     let preferredModel;
-    for (const batch of chunk(features, REVIEW_BATCH_SIZE)) {
+    for (const batch of chunk(deduped, REVIEW_BATCH_SIZE)) {
       const messages = buildReviewMessages(project, batch, historyContext);
       const task = (candidateModel) => hitch.chat({ provider, model: candidateModel, messages, responseFormat: { type: 'json_schema', name: 'dirgest_feature_review', schema: REVIEW_SCHEMA, strict: true } }, credentials);
       const batchCandidates = preferredModel ? [preferredModel, ...candidates.filter((candidate) => candidate !== preferredModel)] : candidates;
