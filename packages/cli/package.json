@@ -1,6 +1,6 @@
 {
   "name": "@dirgest/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Context-aware project feature suggestions CLI",
   "type": "module",
   "keywords": [
@@ -38,7 +38,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@dirgest/sdk": "0.2.0",
+    "@dirgest/sdk": "0.3.0",
     "@opentui/core": "^0.5.4"
   }
 }
