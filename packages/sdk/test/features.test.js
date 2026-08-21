@@ -98,6 +98,19 @@ test('validateFeatureReview matches entries returned out of order and rejects in
   assert.throws(() => validateFeatureReview({ reviews: [] }, features), /at least one feature review/);
 });
 
+test('validateFeatureReview rejects reused prompts and alternatives across different features', () => {
+  const features = ['Add dark mode toggle', 'Add light mode toggle'];
+  assert.throws(() => validateFeatureReview({ reviews: [
+    { feature: features[0], fit: true, reasoning: 'Fits the existing web client.', title: 'Dark Mode Toggle', prompt },
+    { feature: features[1], fit: true, reasoning: 'Also fits the existing web client.', title: 'Light Mode Toggle', prompt }
+  ] }, features), /reuses the same "prompt"/);
+
+  assert.throws(() => validateFeatureReview({ reviews: [
+    { feature: features[0], fit: false, reasoning: 'Not a fit for this project.', alternative: prompt },
+    { feature: features[1], fit: false, reasoning: 'Also not a fit for this project.', alternative: prompt }
+  ] }, features), /reuses the same "alternative"/);
+});
+
 test('mock feature review splits fits from misfits and produces full coding prompts', async () => {
   const review = await reviewFeatures(project, ['Add dark mode toggle', 'A vague aspiration about the future'], { mock: true, source: 'features.md' });
   assert.equal(review.source, 'features.md');

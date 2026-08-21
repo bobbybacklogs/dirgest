@@ -32,12 +32,16 @@ function mockSuggestions(project, mode) {
 export function validateSuggestions(payload) {
   const suggestions = payload?.suggestions;
   if (!Array.isArray(suggestions) || suggestions.length < 4 || suggestions.length > 6) throw new Error('Model response must contain 4 to 6 suggestions.');
+  const seenPrompts = new Map();
   return suggestions.map((suggestion, index) => {
     const title = suggestion?.title?.trim();
     const prompt = suggestion?.prompt?.trim();
     const wordCount = title?.split(/\s+/).length;
     if (!title || wordCount < 3 || wordCount > 4 || !/^[A-Za-z0-9][A-Za-z0-9 &/-]{2,59}$/.test(title)) throw new Error(`Suggestion ${index + 1} has an invalid title; titles must be 3-4 words.`);
     if (!prompt || prompt.length < 80) throw new Error(`Suggestion ${index + 1} has an incomplete coding prompt.`);
+    const duplicateOf = seenPrompts.get(prompt.toLowerCase());
+    if (duplicateOf) throw new Error(`Suggestion ${index + 1} reuses the same prompt as "${duplicateOf}"; every suggestion needs its own distinct prompt.`);
+    seenPrompts.set(prompt.toLowerCase(), title);
     return { title, prompt };
   });
 }

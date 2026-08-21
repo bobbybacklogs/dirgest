@@ -227,6 +227,8 @@ export function validateFeatureReview(payload, features) {
   const reviews = payload?.reviews;
   if (!Array.isArray(reviews) || reviews.length === 0) throw new Error('Review response must contain at least one feature review.');
   const byFeature = new Map(reviews.map((review) => [normalizeFeature(String(review?.feature ?? '')), review]));
+  const seenPrompts = new Map();
+  const seenAlternatives = new Map();
 
   return features.map((feature, index) => {
     const review = byFeature.get(normalizeFeature(feature)) ?? reviews[index];
@@ -237,6 +239,9 @@ export function validateFeatureReview(payload, features) {
     if (review.fit) {
       const prompt = typeof review.prompt === 'string' ? review.prompt.trim() : '';
       if (prompt.length < 80) throw new Error(`Review response for feature ${index + 1} must include a "prompt" with at least 80 characters.`);
+      const duplicateOf = seenPrompts.get(prompt.toLowerCase());
+      if (duplicateOf) throw new Error(`Review response reuses the same "prompt" for feature ${index + 1} and an earlier feature ("${duplicateOf}"); every feature needs its own distinct prompt.`);
+      seenPrompts.set(prompt.toLowerCase(), feature);
       const title = typeof review.title === 'string' ? review.title.trim() : '';
       const wordCount = title ? title.split(/\s+/).length : 0;
       const usableTitle = wordCount >= 3 && wordCount <= 4 && /^[A-Za-z0-9][A-Za-z0-9 &/-]{2,59}$/.test(title) ? title : deriveTitle(feature);
@@ -244,6 +249,9 @@ export function validateFeatureReview(payload, features) {
     }
     const alternative = typeof review.alternative === 'string' ? review.alternative.trim() : '';
     if (alternative.length < 80) throw new Error(`Review response for feature ${index + 1} must include an "alternative" with at least 80 characters.`);
+    const duplicateOf = seenAlternatives.get(alternative.toLowerCase());
+    if (duplicateOf) throw new Error(`Review response reuses the same "alternative" for feature ${index + 1} and an earlier feature ("${duplicateOf}"); every feature needs its own distinct alternative.`);
+    seenAlternatives.set(alternative.toLowerCase(), feature);
     return { feature, fit: false, reasoning, alternative };
   });
 }
