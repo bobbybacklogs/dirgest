@@ -3,6 +3,23 @@
   "version": "0.2.0",
   "description": "Dirgest API server",
   "type": "module",
+  "keywords": [
+    "api",
+    "hono",
+    "codebase-analysis",
+    "llm",
+    "feature-suggestions",
+    "ai"
+  ],
+  "homepage": "https://github.com/bobbybacklogs/dirgest#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bobbybacklogs/dirgest.git",
+    "directory": "packages/api"
+  },
+  "bugs": {
+    "url": "https://github.com/bobbybacklogs/dirgest/issues"
+  },
   "license": "MIT",
   "bin": {
     "dirgest-api": "bin/server.js"

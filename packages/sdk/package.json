@@ -3,6 +3,22 @@
   "version": "0.2.0",
   "description": "Context-aware project suggestion engine",
   "type": "module",
+  "keywords": [
+    "codebase-analysis",
+    "llm",
+    "prompt-generation",
+    "feature-suggestions",
+    "ai"
+  ],
+  "homepage": "https://github.com/bobbybacklogs/dirgest#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bobbybacklogs/dirgest.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/bobbybacklogs/dirgest/issues"
+  },
   "exports": {
     ".": "./lib/index.js",
     "./types": "./lib/types.js",

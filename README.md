@@ -1,129 +1,186 @@
+<div align="center">
+
 # dirgest
 
-`dirgest` inspects a small, privacy-conscious sample of a local project and turns it into 4-6 practical feature ideas. Pick an idea to print a complete coding prompt, or print every prompt at once.
+**Reads your codebase. Tells you what to build next — and hands you the prompt to build it.**
 
-## Install
+[![@dirgest/cli](https://img.shields.io/npm/v/%40dirgest%2Fcli?logo=npm&label=%40dirgest%2Fcli&color=cb3837)](https://www.npmjs.com/package/@dirgest/cli) [![@dirgest/sdk](https://img.shields.io/npm/v/%40dirgest%2Fsdk?logo=npm&label=%40dirgest%2Fsdk&color=cb3837)](https://www.npmjs.com/package/@dirgest/sdk) [![@dirgest/api](https://img.shields.io/npm/v/%40dirgest%2Fapi?logo=npm&label=%40dirgest%2Fapi&color=cb3837)](https://www.npmjs.com/package/@dirgest/api) [![node](https://img.shields.io/node/v/%40dirgest%2Fcli?logo=node.js&logoColor=white&color=5fa04e)](https://nodejs.org) [![license](https://img.shields.io/npm/l/%40dirgest%2Fcli?color=6e8cff)](LICENSE)
 
-Requires Node.js 18 or later.
+</div>
+
+---
 
 ```sh
-npx @dirgest/cli --suggestions
+npx @dirgest/cli --suggest
 ```
 
-Or install globally:
+That's it. Dirgest samples your project, works out what it actually is, and returns 4–6 feature ideas. Pick one and it prints a complete coding prompt you can paste straight into your agent.
+
+<br>
+
+## Why
+
+| | |
+|---|---|
+| **Grounded** | Reads entry points, configs, schemas, and routes first — not a random file dump. |
+| **Honest** | Ask it anything and it will tell you when your idea doesn't fit, and what does. |
+| **Private** | Bounded sample only. No `.git`, no `node_modules`, no `.env`, no lockfiles, no binaries. |
+| **Portable** | One engine (`@dirgest/sdk`) behind a CLI, an HTTP API, and a web UI. |
+
+<br>
+
+## Commands
 
 ```sh
-npm install -g @dirgest/cli
-dirgest --suggestions
+dirgest --suggest                      # 4-6 balanced ideas
+dirgest --suggest growth               # or: ux · technical · wild
+dirgest --ask "add a dark mode toggle" # does this idea fit?
+dirgest --review roadmap.md            # score a whole feature list
+dirgest --suggest --crawl              # widen the context first
+dirgest --history                      # what you've picked before
 ```
 
-## Use
+| Flag | Does |
+|---|---|
+| `-s, --suggest [mode]` | `growth` · `ux` · `technical` · `wild`, or omit for balanced |
+| `-a, --ask <question>` | Fit / no-fit verdict, with reasoning and a prompt or an alternative |
+| `-r, --review <file>` | Review a `.md` / `.txt` feature list against the codebase |
+| `-d, --dir <path>` | Target a different project (defaults to cwd) |
+| `--crawl` | Map up to 2,000 files and sample 96 across directories |
+| `--mock` | Deterministic offline output — no API key needed |
+| `--history` / `--clear-history` | Read or wipe `.dirgest/history.json` |
+
+In a real terminal, suggestions open in an interactive browser — `↑`/`↓` or `j`/`k` to preview, `Enter` or `1`–`6` to pick, `a` for all, `q` to quit. Needs Node 26.4+; older versions fall back to a plain picker automatically.
+
+Selections are remembered in `.dirgest/history.json` and fed back into later prompts, so dirgest stops repeating ground you've already covered.
+
+<br>
+
+## Review a feature list
+
+Got a roadmap doc full of ideas? Point dirgest at it.
 
 ```sh
-dirgest --suggestions
-dirgest --dir "C:\\path\\to\\project" --suggest
-dirgest --suggest growth
-dirgest --suggest ux
-dirgest --suggest technical
-dirgest --suggest wild
-dirgest --suggest --crawl
-dirgest --ask "add a dark mode toggle"
 dirgest --review roadmap.md
-dirgest --history
-dirgest --clear-history
-dirgest -d . -s --mock
-dirgest --help
 ```
 
-The result header shows the detected project name and scanned directory. In an interactive terminal, suggestions open in an OpenTUI browser: use arrow keys or `j`/`k` to preview, Enter or `1` through `6` to choose, `a` to print all prompts, or `q` to leave. The browser requires Node.js 26.4 or later; dirgest automatically enables the required FFI flag and falls back to the basic picker on older Node versions. With redirected/non-interactive input, dirgest prints the suggestion list and exits without waiting for input.
+It reads one feature per line or list item, checks each against the whole crawled codebase, and splits the result:
 
-`--suggest` (and the legacy `--suggestions`) produces balanced, product-next ideas. Add `growth` for activation, retention, and monetization ideas; `ux` for friction and experience improvements; `technical` for architecture, debt, and reliability work; or `wild` for novel adjacent capabilities grounded in the current project.
+```
+Feature review: roadmap.md
+4 reviewed  3 good fit  1 not a fit
 
-Add `--crawl` to build a broader cross-directory context before generating suggestions. Crawl mode maps up to 2,000 readable source/configuration/documentation files, includes the resulting project layout in the model context, and samples up to 96 representative files across directories. It continues to ignore `.git`, dependencies, generated output, lockfiles, `.env*` files, binaries, and files larger than 48 KB.
+✗ Not a fit (1)
+   1  Ship a physical hardware dongle for offline use
+      Dirgest is a Node monorepo with no hardware or firmware surface.
+      Better fit: Add an offline cache so previously scanned projects…
 
-`--history` displays previously selected suggestions for the project. `--clear-history` wipes the history. Selections are stored in `.dirgest/history.json` within the project directory and are automatically injected into the prompt so future runs avoid repeating explored areas.
+✓ Good fits (3)
 
-## Reviewing A Feature List
-
-`--review <file>` ingests a feature list you already have and checks every entry against the real codebase:
-
-```sh
-dirgest --review roadmap.md
-dirgest --review features.txt --dir "C:\\path\\to\\project"
+1. Export Prompts To File
+Add an --export flag that writes prompts to a file
+Implement an --export flag for @dirgest/cli that writes the selected prompt…
 ```
 
-Only `.txt` and `.md` files are accepted, up to 64 KB and 40 features. One feature per line or list item; when the document contains headings or list markers, only those lines are read as features so surrounding prose is ignored. Fenced code blocks, horizontal rules, tables, and duplicates are skipped, and inline emphasis, links, code spans, and task checkboxes are stripped.
+Misfits come with the specific reason and a better-fitting alternative. Good fits come as full coding prompts, same style as `--suggest`.
 
-Review always builds the broader `--crawl` context so fit is judged against the whole project rather than a bounded sample. The output is two lists: the features that are **not** a fit, each with the specific reason and a better-fitting alternative, followed by the **good fits** rendered in dirgest's usual numbered title + full coding prompt style. Large lists are evaluated in batches so long files are not truncated.
+> `.txt` and `.md` only · max 64 KB · max 40 features · headings and list items are read as features, surrounding prose is ignored
 
-`--mock` works here too, producing a deterministic offline split for local verification.
+<br>
 
-## Model Configuration
-
-`modelhitch` is pinned to `0.14.0` and is used through its direct `new ModelHitch().chat()` API. Before applying dirgest defaults, dirgest checks ModelHitch's built-in providers for their configured API-key environment variables (including provider fallbacks) and uses the first configured provider with a model that avoids modelhitch's frequently rate-limited free demo default `big-pickle`. On the direct path, an auto-detected `opencode-zen` provider with default model `big-pickle` is substituted with `deepseek-v4-flash`; other providers keep their native default (e.g. `openai` → `gpt-4o-mini`, `groq` → `llama-3.3-70b-versatile`). On the bridge path, dirgest prefers the first advertised model from a small reliable list (`deepseek-v4-flash`, `gpt-5.6-luna`, `gpt-5.4-mini`, `gpt-5.4-nano`, `claude-haiku-4-5`, `gemini-3.5-flash-lite`), falling back to `big-pickle` only when none of those are advertised. If no direct credential is present, dirgest also detects a healthy local ModelHitch bridge at `http://127.0.0.1:3939`, selects an advertised model, and routes through it. If neither is available, dirgest falls back to ModelHitch's `openai` provider and `gpt-4o-mini`.
-
-To survive flaky or quota-limited upstream models, dirgest re-attempts each request with the next preferred model when ModelHitch reports a retryable failure (`rate-limited`, upstream `provider-error`, or any HTTP 429/5xx), bounded by the number of candidate models. This fallback applies to the bridge path and to the direct `opencode-zen` path; other providers are never sent an unrelated model id. `DIRGEST_MODEL` / `DIRGEST_BRIDGE_MODEL` remain the first model attempted.
-
-```sh
-set OPENAI_API_KEY=your-key
-set DIRGEST_MODEL=gpt-4.1-mini
-dirgest --suggestions
-```
-
-Set `DIRGEST_PROVIDER` to explicitly select a ModelHitch provider and `DIRGEST_MODEL` to explicitly select its model; these overrides take precedence over auto-detection. Set `DIRGEST_BRIDGE_URL` or `DIRGEST_BRIDGE_MODEL` to override the local bridge endpoint or its selected model; `DIRGEST_BRIDGE_MODEL` fully overrides the bridge preference list above. The local bridge uses its documented `sk-bridge-local` placeholder credential; dirgest does not print environment values or API keys. `--mock` bypasses all network and API-key requirements and generates deterministic project-aware suggestions, which is useful for local verification.
-
-## What Is Read
-
-Dirgest sends only a bounded sample: at most 24 recognized source/configuration/README files, each no larger than 48 KB, truncated to 12,000 characters total. It ignores `.git`, `node_modules`, common output/cache folders, lockfiles, `.env*` files, large files, and binary files. No suggestions are persisted.
-
-With `--crawl`, the directory layout is also sent and the representative source sample grows to at most 96 files and 36,000 characters. This gives the model a broader project-level view without sending ignored or sensitive files.
-
-Files are sorted by architectural importance before sampling: entry points (`index.js`, `main.ts`, `app.py`) and config files (`package.json`, `tsconfig.json`) are included first, followed by schema/model files, route handlers, core modules, and finally tests and utilities. This ensures the LLM sees the most contextually important files within its character budget.
-
-Before generating suggestions, dirgest extracts a project analysis summary from the scanned files and `package.json`: detected language, framework, project type (fullstack app, CLI tool, library, etc.), entry points, and key dependencies (including Firebase, AWS, and AI/ML packages). This summary is included in the prompt alongside the source sample, giving the model a structured understanding of the project before it reads the code.
-
-If the supplied path is missing or is not a directory, dirgest reports a clear error. A live provider failure, malformed response, or missing default OpenAI key is also reported without exposing secrets.
-
-## Development
-
-```sh
-git clone https://github.com/genoventures-labs/dirgest.git
-cd dirgest
-npm install
-npm test
-```
-
-The monorepo contains:
-
-- **`packages/sdk`** — `@dirgest/sdk` — the engine (zero dependencies beyond modelhitch)
-- **`packages/cli`** — `@dirgest/cli` — terminal interface
-- **`packages/api`** — `@dirgest/api` — HTTP API + web UI
-- **`packages/web`** — React SPA (bundled into the API package)
-
-## Local Development (Web UI)
-
-One command starts both the API server and the web dev server (with live reload):
-
-```sh
-npm run dev
-```
-
-- **API** — `http://localhost:3940` (also serves the built SPA at `/`)
-- **Web dev server** — `http://localhost:5173` (hot reload, proxies `/api` to the API)
-
-Or run them separately:
-
-```sh
-npm run dev:api   # API on :3940
-npm run dev:web   # Vite dev server on :5173
-```
-
-Upload files to inspect a project, generate suggestions across 5 modes, ask feature questions, review a `.md`/`.txt` feature list, and view history — all through the browser.
-
-## API + Web UI (installed)
+## Web UI
 
 ```sh
 npx @dirgest/api
 ```
 
-Starts the API server on port 3940. Open `http://localhost:3940` for the web interface.
+Opens on [localhost:3940](http://localhost:3940). Drop in a project, then use the same five capabilities from the browser — inspect, suggest, ask, review a list, and history.
+
+<br>
+
+## Configuration
+
+`--mock` needs nothing. For real output, set any supported provider key and dirgest works out the rest.
+
+```sh
+export OPENAI_API_KEY=sk-...
+dirgest --suggest
+```
+
+| Variable | Purpose |
+|---|---|
+| `DIRGEST_PROVIDER` | Force a ModelHitch provider |
+| `DIRGEST_MODEL` | Force a model (tried first) |
+| `DIRGEST_BRIDGE_URL` | Local ModelHitch bridge (default `http://127.0.0.1:3939`) |
+| `DIRGEST_BRIDGE_MODEL` | Force the bridge model |
+
+<details>
+<summary><b>How model selection actually works</b></summary>
+
+<br>
+
+Dirgest pins `modelhitch@0.14.0` and calls it directly via `new ModelHitch().chat()`.
+
+1. **Configured provider first.** Dirgest scans ModelHitch's providers for a configured API-key env var (including fallbacks) and uses the first one it finds.
+2. **Avoids the free-tier default.** ModelHitch's demo default `big-pickle` is heavily rate-limited, so an auto-detected `opencode-zen` provider gets `deepseek-v4-flash` instead. Other providers keep their native default (`openai` → `gpt-4o-mini`, `groq` → `llama-3.3-70b-versatile`).
+3. **Local bridge fallback.** With no direct credential, dirgest probes `http://127.0.0.1:3939` and, if healthy, picks the first advertised model from `deepseek-v4-flash` → `gpt-5.6-luna` → `gpt-5.4-mini` → `gpt-5.4-nano` → `claude-haiku-4-5` → `gemini-3.5-flash-lite`.
+4. **Retry on failure.** Any retryable error (`rate-limited`, upstream `provider-error`, HTTP 429/5xx) rotates to the next candidate model. Explicit overrides stay first in line.
+
+Dirgest never prints env values or API keys.
+
+</details>
+
+<details>
+<summary><b>What dirgest reads</b></summary>
+
+<br>
+
+| | Default | `--crawl` |
+|---|---|---|
+| Files sampled | 24 | 96 |
+| Files discovered | — | 2,000 |
+| Sample budget | 12,000 chars | 36,000 chars |
+| Project tree included | no | yes |
+
+Max 48 KB per file. Always ignored: `.git`, `node_modules`, build and cache output, lockfiles, `.env*`, and binaries.
+
+Files are ranked by architectural importance before sampling, so the model spends its budget on what matters:
+
+```
+0  entry points     index.js · main.ts · app.py · server.go
+1  config & docs    package.json · tsconfig.json · README.md
+2  schemas          schema.* · model.* · migration.*
+3  routes           routes/ · handlers/ · controllers/
+4  source
+5  utilities        lib/ · utils/ · helpers/
+6  tests
+```
+
+Dirgest also derives a project analysis — language, framework, project type, entry points, and notable dependencies — and sends that alongside the sample so the model understands the project before it reads code. Nothing is persisted except the selections you make.
+
+</details>
+
+<br>
+
+## Development
+
+```sh
+git clone https://github.com/bobbybacklogs/dirgest.git
+cd dirgest && npm install && npm test
+npm run dev        # API on :3940, Vite on :5173
+```
+
+| Package | |
+|---|---|
+| [`@dirgest/sdk`](packages/sdk) | The engine. Scanning, prompting, model fallback. |
+| [`@dirgest/cli`](packages/cli) | Terminal client. |
+| [`@dirgest/api`](packages/api) | Hono HTTP API, serves the web UI. |
+| `@dirgest/web` | React SPA, bundled into the API package. |
+
+> **No client implements dirgest intelligence.** Every client consumes `@dirgest/sdk`. See [ROADMAP.md](ROADMAP.md).
+
+<br>
+
+## License
+
+MIT © [Bobby Backlogs](https://github.com/bobbybacklogs)

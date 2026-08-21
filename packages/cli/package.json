@@ -3,6 +3,23 @@
   "version": "0.2.0",
   "description": "Context-aware project feature suggestions CLI",
   "type": "module",
+  "keywords": [
+    "cli",
+    "codebase-analysis",
+    "llm",
+    "prompt-generation",
+    "feature-suggestions",
+    "ai"
+  ],
+  "homepage": "https://github.com/bobbybacklogs/dirgest#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bobbybacklogs/dirgest.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/bobbybacklogs/dirgest/issues"
+  },
   "license": "MIT",
   "bin": {
     "dirgest": "bin/dirgest.js"
