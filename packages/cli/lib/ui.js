@@ -17,6 +17,24 @@ export function renderAskResponse(response, question) {
   return `${header}\n\n${color(ANSI.dim, '✗ Not a great fit for this codebase')}\n\n${response.reasoning}\n\n${color(ANSI.bold, 'Try this instead:')}\n${response.alternative}`;
 }
 
+export function renderFeatureReview(review) {
+  const source = review.source ? ` ${color(ANSI.bold, review.source)}` : '';
+  const header = `\n${color(ANSI.dim, 'Feature review:')}${source}\n${color(ANSI.dim, `${review.total} reviewed  ${review.fitCount} good fit  ${review.misfitCount} not a fit`)}`;
+  const sections = [header];
+
+  if (review.misfits.length) {
+    const entries = review.misfits.map((misfit, index) => `  ${color(ANSI.red, String(index + 1).padStart(2, ' '))}  ${color(ANSI.bold, misfit.feature)}\n      ${misfit.reasoning}\n      ${color(ANSI.dim, 'Better fit:')} ${misfit.alternative}`);
+    sections.push(`${color(ANSI.bold, `✗ Not a fit (${review.misfits.length})`)}\n${entries.join('\n\n')}`);
+  }
+
+  if (review.fits.length) {
+    const entries = review.fits.map((fit, index) => `${color(ANSI.bold + ANSI.cyan, `${index + 1}. ${fit.title}`)}\n${color(ANSI.dim, fit.feature)}\n${fit.prompt}`);
+    sections.push(`${color(ANSI.green, `✓ Good fits (${review.fits.length})`)}\n\n${entries.join('\n\n')}`);
+  }
+
+  return sections.join('\n\n');
+}
+
 export function renderHistory(history) {
   if (!history.length) return `\n${color(ANSI.dim, 'No suggestion history yet.')}`;
   const lines = history.map((entry) => {

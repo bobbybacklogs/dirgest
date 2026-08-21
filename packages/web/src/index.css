@@ -94,6 +94,12 @@ body {
   color: var(--text-2);
 }
 
+.card-subtitle {
+  color: var(--text-2);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
 /* Upload zone */
 .upload-zone {
   border: 2px dashed var(--border);

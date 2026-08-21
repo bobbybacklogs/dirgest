@@ -4,6 +4,7 @@ import type {
   SuggestionsResult,
   SuggestionMode,
   AskResult,
+  ReviewResult,
   HistoryResult,
   JobResult,
   ProjectFile,
@@ -54,6 +55,18 @@ export async function askQuestion(
   return request<AskResult>(`/api/v1/projects/${id}/ask`, {
     method: 'POST',
     body: JSON.stringify({ question, mock }),
+  });
+}
+
+export async function reviewFeatures(
+  id: string,
+  content: string,
+  filename: string,
+  mock = false,
+): Promise<ReviewResult> {
+  return request<ReviewResult>(`/api/v1/projects/${id}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ content, filename, mock }),
   });
 }
 

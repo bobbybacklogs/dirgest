@@ -178,6 +178,47 @@ test('POST /projects/:id/ask rejects missing question', async () => {
   assert.equal(res.status, 400);
 });
 
+// --- Feature review ---
+
+async function uploadProject() {
+  const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'a.js', content: '{}' }], name: 'a' });
+  const { data: { id } } = await insp.json();
+  return id;
+}
+
+test('POST /projects/:id/review splits a markdown feature list into fits and misfits', async () => {
+  const id = await uploadProject();
+  const res = await req('POST', `/api/v1/projects/${id}/review`, { content: '- Add dark mode toggle\n- A vague aspiration about the future\n', filename: 'features.md', mock: true });
+  assert.equal(res.status, 200);
+  const { data } = await res.json();
+  assert.equal(data.review.source, 'features.md');
+  assert.equal(data.review.total, 2);
+  assert.equal(data.review.fits.length, 1);
+  assert.equal(data.review.misfits.length, 1);
+  assert.ok(data.review.fits[0].prompt.length >= 80);
+  assert.ok(data.review.misfits[0].reasoning);
+});
+
+test('POST /projects/:id/review accepts a features array', async () => {
+  const id = await uploadProject();
+  const res = await req('POST', `/api/v1/projects/${id}/review`, { features: ['Add dark mode toggle'], mock: true });
+  assert.equal(res.status, 200);
+  const { data } = await res.json();
+  assert.equal(data.review.total, 1);
+});
+
+test('POST /projects/:id/review rejects unsupported file types, missing input, and oversized content', async () => {
+  const id = await uploadProject();
+  const badType = await req('POST', `/api/v1/projects/${id}/review`, { content: '- Add dark mode toggle', filename: 'features.json', mock: true });
+  assert.equal(badType.status, 400);
+  const missing = await req('POST', `/api/v1/projects/${id}/review`, { mock: true });
+  assert.equal(missing.status, 400);
+  const empty = await req('POST', `/api/v1/projects/${id}/review`, { content: '\n\n', filename: 'features.md', mock: true });
+  assert.equal(empty.status, 400);
+  const oversized = await req('POST', `/api/v1/projects/${id}/review`, { content: 'x'.repeat(64 * 1024 + 1), filename: 'features.md', mock: true });
+  assert.equal(oversized.status, 413);
+});
+
 // --- History ---
 
 test('GET /projects/:id/history returns history array', async () => {

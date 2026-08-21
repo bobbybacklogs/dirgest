@@ -4,6 +4,7 @@ import type {
   Suggestion,
   SuggestionMode,
   AskResponse,
+  FeatureReview,
   HistoryEntry,
 } from './types';
 import * as api from './api/client';
@@ -11,9 +12,10 @@ import { ProjectUpload } from './components/ProjectUpload';
 import { ProjectView } from './components/ProjectView';
 import { SuggestionPanel } from './components/SuggestionPanel';
 import { AskPanel } from './components/AskPanel';
+import { ReviewPanel } from './components/ReviewPanel';
 import { HistoryPanel } from './components/HistoryPanel';
 
-type Tab = 'understand' | 'suggest' | 'ask' | 'history';
+type Tab = 'understand' | 'suggest' | 'ask' | 'review' | 'history';
 
 interface ProjectState {
   id: string;
@@ -26,6 +28,7 @@ export function App() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeMode, setActiveMode] = useState<SuggestionMode>('balanced');
   const [askResponse, setAskResponse] = useState<AskResponse | null>(null);
+  const [review, setReview] = useState<FeatureReview | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -48,6 +51,7 @@ export function App() {
       setProject({ id: result.id, context: result.context });
       setSuggestions([]);
       setAskResponse(null);
+      setReview(null);
       setTab('understand');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Upload failed');
@@ -83,6 +87,22 @@ export function App() {
         setAskResponse(result.response);
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Failed to evaluate');
+      } finally {
+        setLoading(null);
+      }
+    },
+    [project, showToast],
+  );
+
+  const handleReviewFeatures = useCallback(
+    async (content: string, filename: string) => {
+      if (!project) return;
+      setLoading(`Reviewing ${filename}\u2026`);
+      try {
+        const result = await api.reviewFeatures(project.id, content, filename, true);
+        setReview(result.review);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Failed to review features');
       } finally {
         setLoading(null);
       }
@@ -130,6 +150,7 @@ export function App() {
     setProject(null);
     setSuggestions([]);
     setAskResponse(null);
+    setReview(null);
     setHistory([]);
     setTab('understand');
   }, []);
@@ -153,7 +174,7 @@ export function App() {
       ) : (
         <>
           <div className="tabs">
-            {(['understand', 'suggest', 'ask', 'history'] as const).map((t) => (
+            {(['understand', 'suggest', 'ask', 'review', 'history'] as const).map((t) => (
               <button
                 key={t}
                 className={`tab ${tab === t ? 'active' : ''}`}
@@ -168,7 +189,9 @@ export function App() {
                     ? 'Suggestions'
                     : t === 'ask'
                       ? 'Ask'
-                      : 'History'}
+                      : t === 'review'
+                        ? 'Review list'
+                        : 'History'}
               </button>
             ))}
             <button className="tab" onClick={handleReset} style={{ marginLeft: 'auto' }}>
@@ -194,6 +217,12 @@ export function App() {
             <AskPanel
               response={askResponse}
               onAsk={handleAsk}
+            />
+          )}
+          {tab === 'review' && (
+            <ReviewPanel
+              review={review}
+              onReview={handleReviewFeatures}
             />
           )}
           {tab === 'history' && (

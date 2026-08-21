@@ -142,6 +142,13 @@ async function resolveProviderCandidates(hitch, environment = process.env) {
   return { configuration, candidates };
 }
 
+// Shared entry point so every SDK capability resolves providers and fallback models identically.
+export async function createModelSession(environment = process.env) {
+  const hitch = new ModelHitch();
+  const { configuration, candidates } = await resolveProviderCandidates(hitch, environment);
+  return { hitch, configuration, candidates };
+}
+
 function buildSuggestionMessages(project, mode, historyContext) {
   const summaryBlock = project.summary ? `\n\nProject analysis:\n${project.summary}` : '';
   const treeBlock = project.crawl && project.tree ? `\n\nFull project layout from crawl:\n${project.tree}` : '';

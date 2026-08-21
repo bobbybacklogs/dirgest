@@ -54,6 +54,28 @@ export interface AskResponseNoFit {
 
 export type AskResponse = AskResponseFit | AskResponseNoFit;
 
+export interface FeatureFit {
+  feature: string;
+  title: string;
+  reasoning: string;
+  prompt: string;
+}
+
+export interface FeatureMisfit {
+  feature: string;
+  reasoning: string;
+  alternative: string;
+}
+
+export interface FeatureReview {
+  source?: string;
+  total: number;
+  fitCount: number;
+  misfitCount: number;
+  fits: FeatureFit[];
+  misfits: FeatureMisfit[];
+}
+
 export interface HistoryEntry {
   timestamp: number;
   mode: string;
@@ -81,6 +103,11 @@ export interface SuggestionsResult {
 export interface AskResult {
   id: string;
   response: AskResponse;
+}
+
+export interface ReviewResult {
+  id: string;
+  review: FeatureReview;
 }
 
 export interface HistoryResult {

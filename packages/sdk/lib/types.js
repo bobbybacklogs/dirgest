@@ -64,6 +64,39 @@
  */
 
 /**
+ * @typedef {Object} FeatureFit
+ * @property {string} feature - The proposed feature text as supplied in the feature file
+ * @property {string} title - Feature title (3-4 words) used when rendering the coding prompt
+ * @property {string} reasoning - 1-2 sentence explanation of why the feature fits
+ * @property {string} prompt - Complete, actionable coding prompt (at least 80 characters)
+ */
+
+/**
+ * @typedef {Object} FeatureMisfit
+ * @property {string} feature - The proposed feature text as supplied in the feature file
+ * @property {string} reasoning - 1-2 sentence explanation of why the feature does not fit this project
+ * @property {string} alternative - A better-fitting feature prompt (at least 80 characters)
+ */
+
+/**
+ * @typedef {Object} FeatureReview
+ * @property {string|undefined} source - Name of the reviewed feature file, when one was supplied
+ * @property {number} total - Number of features reviewed
+ * @property {number} fitCount - Number of features judged a good fit
+ * @property {number} misfitCount - Number of features judged a poor fit
+ * @property {FeatureFit[]} fits - Good fits, each with a full coding prompt
+ * @property {FeatureMisfit[]} misfits - Poor fits, each with a reason and an alternative
+ */
+
+/**
+ * @typedef {Object} FeatureFileResult
+ * @property {string} path - Absolute path to the feature file
+ * @property {string} name - File basename
+ * @property {string} content - Raw file contents
+ * @property {string[]} features - Parsed feature list (one entry per line or list item)
+ */
+
+/**
  * @typedef {Object} HistoryEntry
  * @property {number} timestamp - Unix timestamp (Date.now()) when the selection was made
  * @property {string} mode - The suggestion mode used when the selection was made

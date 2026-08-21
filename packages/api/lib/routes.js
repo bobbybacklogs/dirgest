@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { buildProjectContext, inspectProject, getSuggestions, getAskResponse, readHistory, clearHistory, writeHistory } from '@dirgest/sdk';
+import { buildProjectContext, inspectProject, getSuggestions, getAskResponse, parseFeatureList, reviewFeatures, readHistory, clearHistory, writeHistory, FEATURE_FILE_EXTENSIONS, MAX_FEATURE_FILE_BYTES, MAX_FEATURES } from '@dirgest/sdk';
 
 const API_VERSION = 'v1';
 
@@ -13,6 +13,11 @@ function fail(code, message, status = 400) {
 
 function validateMode(mode) {
   return ['balanced', 'growth', 'ux', 'technical', 'wild'].includes(mode);
+}
+
+function extensionOf(filename) {
+  const dot = filename.lastIndexOf('.');
+  return dot === -1 ? '' : filename.slice(dot).toLowerCase();
 }
 
 export function createRoutes(cache, jobs) {
@@ -82,6 +87,39 @@ export function createRoutes(cache, jobs) {
     const environment = Object.fromEntries(Object.entries(process.env).filter(([, v]) => typeof v === 'string'));
     const response = await getAskResponse(context, question, { mock, environment });
     return ok({ id, response });
+  });
+
+  // POST /projects/:id/review — review a .md/.txt feature list against the project
+  app.post('/projects/:id/review', async (c) => {
+    const id = c.req.param('id');
+    const context = cache.get(id);
+    if (!context) return fail('not-found', `Project ${id} not found. Inspect it first.`, 404);
+    const { content, filename, features, mock = false } = await c.req.json();
+    if (filename && !FEATURE_FILE_EXTENSIONS.includes(extensionOf(filename))) {
+      return fail('bad-request', `Feature files must be ${FEATURE_FILE_EXTENSIONS.join(' or ')}; received "${filename}".`);
+    }
+
+    let featureList;
+    if (Array.isArray(features)) {
+      featureList = features.map((feature) => String(feature ?? '').trim()).filter(Boolean);
+      if (featureList.length === 0) return fail('bad-request', 'The "features" array must contain at least one feature.');
+      if (featureList.length > MAX_FEATURES) return fail('payload-too-large', `Received ${featureList.length} features; the limit is ${MAX_FEATURES}.`, 413);
+    } else if (typeof content === 'string') {
+      if (Buffer.byteLength(content, 'utf8') > MAX_FEATURE_FILE_BYTES) {
+        return fail('payload-too-large', `Feature file content exceeds the ${MAX_FEATURE_FILE_BYTES / 1024} KB limit.`, 413);
+      }
+      try {
+        featureList = parseFeatureList(content, filename || 'feature file');
+      } catch (error) {
+        return fail('bad-request', error.message);
+      }
+    } else {
+      return fail('bad-request', 'A "content" string or a "features" array is required.');
+    }
+
+    const environment = Object.fromEntries(Object.entries(process.env).filter(([, v]) => typeof v === 'string'));
+    const review = await reviewFeatures(context, featureList, { mock, environment, source: filename });
+    return ok({ id, review });
   });
 
   // GET /projects/:id/history — read suggestion history

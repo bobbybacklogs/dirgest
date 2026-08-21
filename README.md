@@ -27,6 +27,8 @@ dirgest --suggest ux
 dirgest --suggest technical
 dirgest --suggest wild
 dirgest --suggest --crawl
+dirgest --ask "add a dark mode toggle"
+dirgest --review roadmap.md
 dirgest --history
 dirgest --clear-history
 dirgest -d . -s --mock
@@ -40,6 +42,21 @@ The result header shows the detected project name and scanned directory. In an i
 Add `--crawl` to build a broader cross-directory context before generating suggestions. Crawl mode maps up to 2,000 readable source/configuration/documentation files, includes the resulting project layout in the model context, and samples up to 96 representative files across directories. It continues to ignore `.git`, dependencies, generated output, lockfiles, `.env*` files, binaries, and files larger than 48 KB.
 
 `--history` displays previously selected suggestions for the project. `--clear-history` wipes the history. Selections are stored in `.dirgest/history.json` within the project directory and are automatically injected into the prompt so future runs avoid repeating explored areas.
+
+## Reviewing A Feature List
+
+`--review <file>` ingests a feature list you already have and checks every entry against the real codebase:
+
+```sh
+dirgest --review roadmap.md
+dirgest --review features.txt --dir "C:\\path\\to\\project"
+```
+
+Only `.txt` and `.md` files are accepted, up to 64 KB and 40 features. One feature per line or list item; when the document contains headings or list markers, only those lines are read as features so surrounding prose is ignored. Fenced code blocks, horizontal rules, tables, and duplicates are skipped, and inline emphasis, links, code spans, and task checkboxes are stripped.
+
+Review always builds the broader `--crawl` context so fit is judged against the whole project rather than a bounded sample. The output is two lists: the features that are **not** a fit, each with the specific reason and a better-fitting alternative, followed by the **good fits** rendered in dirgest's usual numbered title + full coding prompt style. Large lists are evaluated in batches so long files are not truncated.
+
+`--mock` works here too, producing a deterministic offline split for local verification.
 
 ## Model Configuration
 
@@ -101,7 +118,7 @@ npm run dev:api   # API on :3940
 npm run dev:web   # Vite dev server on :5173
 ```
 
-Upload files to inspect a project, generate suggestions across 5 modes, ask feature questions, and view history — all through the browser.
+Upload files to inspect a project, generate suggestions across 5 modes, ask feature questions, review a `.md`/`.txt` feature list, and view history — all through the browser.
 
 ## API + Web UI (installed)
 

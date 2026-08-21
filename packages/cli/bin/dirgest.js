@@ -3,9 +3,9 @@
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
-import { inspectProject, getAskResponse, getSuggestions, readHistory, writeHistory, clearHistory } from '@dirgest/sdk';
+import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory } from '@dirgest/sdk';
 import { promptForSelection } from '../lib/selection.js';
-import { browseSuggestions, renderAskResponse, renderError, renderHeader, renderHistory, renderPrompts, renderSuggestions } from '../lib/ui.js';
+import { browseSuggestions, renderAskResponse, renderError, renderFeatureReview, renderHeader, renderHistory, renderPrompts, renderSuggestions } from '../lib/ui.js';
 
 const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number);
 const canUseOpenTui = nodeMajor > 26 || (nodeMajor === 26 && nodeMinor >= 4);
@@ -23,6 +23,7 @@ Usage:
   dirgest --suggestions [--dir <directory>] [--crawl] [--mock]
   dirgest --suggest [growth|ux|technical|wild] [--dir <directory>] [--crawl] [--mock]
   dirgest --ask <question> [--dir <directory>] [--crawl] [--mock]
+  dirgest --review <file.md|file.txt> [--dir <directory>] [--mock]
   dirgest --history [--dir <directory>]
   dirgest --clear-history [--dir <directory>]
 
@@ -31,6 +32,7 @@ Options:
     -s, --suggest [mode]   Generate balanced suggestions, or target growth, ux, technical, or wild ideas
       --suggestions      Generate balanced feature suggestions (legacy alias)
   -a, --ask <question>    Evaluate a feature idea against the codebase
+  -r, --review <file>     Review a .md or .txt feature list against the codebase (implies --crawl)
        --history          Show previously selected suggestions
        --clear-history    Clear suggestion history
        --crawl            Build a broader cross-directory project context
@@ -39,7 +41,7 @@ Options:
 `;
 
 function parseArguments(argumentsList) {
-  const options = { directory: process.cwd(), mock: false, crawl: false, suggest: false, suggestionMode: 'balanced', help: false, ask: false, askQuestion: '', history: false, clearHistory: false };
+  const options = { directory: process.cwd(), mock: false, crawl: false, suggest: false, suggestionMode: 'balanced', help: false, ask: false, askQuestion: '', review: false, reviewFile: '', history: false, clearHistory: false };
   for (let index = 0; index < argumentsList.length; index += 1) {
     const argument = argumentsList[index];
     if (argument === '-d' || argument === '--dir') {
@@ -62,6 +64,12 @@ function parseArguments(argumentsList) {
       const question = argumentsList[index + 1];
       if (!question || question.startsWith('-')) throw new Error(`${argument} requires a feature question.`);
       options.askQuestion = question;
+      index += 1;
+    } else if (argument === '-r' || argument === '--review') {
+      options.review = true;
+      const file = argumentsList[index + 1];
+      if (!file || file.startsWith('-')) throw new Error(`${argument} requires a .md or .txt feature file.`);
+      options.reviewFile = path.resolve(file);
       index += 1;
     } else if (argument === '--mock') {
       options.mock = true;
@@ -104,16 +112,21 @@ async function main() {
     process.stdout.write(`${renderHeader({ name: 'dirgest', directory: options.directory })}\n${renderHistory(history)}\n`);
     return;
   }
-  if (!options.suggest && !options.ask) {
-    process.stderr.write(`${renderError('Choose --suggestions, --suggest, --ask, --history, or --clear-history.')}\n\n${help}`);
+  if (!options.suggest && !options.ask && !options.review) {
+    process.stderr.write(`${renderError('Choose --suggestions, --suggest, --ask, --review, --history, or --clear-history.')}\n\n${help}`);
     process.exitCode = 2;
     return;
   }
 
   try {
-    const project = await inspectProject(options.directory, { crawl: options.crawl });
+    // A feature review needs the widest possible view of the codebase to judge fit.
+    const featureFile = options.review ? await readFeatureFile(options.reviewFile) : null;
+    const project = await inspectProject(options.directory, { crawl: options.crawl || options.review });
     process.stdout.write(`${renderHeader(project)}\n`);
-    if (options.ask) {
+    if (options.review) {
+      const review = await reviewFeatures(project, featureFile.features, { mock: options.mock, source: featureFile.name });
+      process.stdout.write(`${renderFeatureReview(review)}\n`);
+    } else if (options.ask) {
       const response = await getAskResponse(project, options.askQuestion, { mock: options.mock });
       process.stdout.write(`${renderAskResponse(response, options.askQuestion)}\n`);
     } else {
