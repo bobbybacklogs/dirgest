@@ -19,6 +19,31 @@ const CHECKBOX = /^\[[ xX]\]\s*/;
 const ACTION_VERB = /\b(add|implement|create|build|fix|improve|enhance|update|refactor|support|introduce|enable)\b/;
 const NAME_DESCRIPTION_SEPARATOR = /^(.{2,80}?)(?:\s+[-\u2013\u2014]\s+|:\s+)(\S.{2,})$/;
 
+// Two mutually exclusive item shapes (rather than one shape with optional fields) so a strict
+// JSON-schema model can't satisfy the schema while silently omitting "prompt" or "alternative".
+const REVIEW_ITEM_FIT = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['feature', 'fit', 'reasoning', 'title', 'prompt'],
+  properties: {
+    feature: { type: 'string', minLength: 3 },
+    fit: { type: 'boolean', enum: [true] },
+    reasoning: { type: 'string', minLength: 10, maxLength: 500 },
+    title: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 &/-]{2,59}$' },
+    prompt: { type: 'string', minLength: 80 }
+  }
+};
+const REVIEW_ITEM_MISFIT = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['feature', 'fit', 'reasoning', 'alternative'],
+  properties: {
+    feature: { type: 'string', minLength: 3 },
+    fit: { type: 'boolean', enum: [false] },
+    reasoning: { type: 'string', minLength: 10, maxLength: 500 },
+    alternative: { type: 'string', minLength: 80 }
+  }
+};
 const REVIEW_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -27,19 +52,7 @@ const REVIEW_SCHEMA = {
     reviews: {
       type: 'array',
       minItems: 1,
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['feature', 'fit', 'reasoning'],
-        properties: {
-          feature: { type: 'string', minLength: 3 },
-          title: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 &/-]{2,59}$' },
-          fit: { type: 'boolean' },
-          reasoning: { type: 'string', minLength: 10, maxLength: 500 },
-          prompt: { type: 'string', minLength: 80 },
-          alternative: { type: 'string', minLength: 80 }
-        }
-      }
+      items: { anyOf: [REVIEW_ITEM_FIT, REVIEW_ITEM_MISFIT] }
     }
   }
 };
@@ -177,9 +190,9 @@ Return one review entry for EVERY feature you are given, in the same order, with
 - feature: the feature text exactly as supplied.
 - fit: true only if the feature genuinely belongs in this project's architecture, stack, and purpose.
 - reasoning: 1-2 sentences. When fit is false, acknowledge the idea may be good in general and explain the specific mismatch with this codebase.
-- title: required when fit is true. Exactly 3 or 4 words naming the feature.
-- prompt: required when fit is true. A complete, actionable coding prompt of at least 80 characters covering scope, the relevant existing context in this codebase, expected behavior, edge cases, and validation.
-- alternative: required when fit is false. A different feature prompt of at least 80 characters that would fit this project better.
+- title: ALWAYS required when fit is true, and must be omitted when fit is false. Exactly 3 or 4 words naming the feature.
+- prompt: ALWAYS required when fit is true, and must be omitted when fit is false. A complete, actionable coding prompt of at least 80 characters covering scope, the relevant existing context in this codebase, expected behavior, edge cases, and validation.
+- alternative: ALWAYS required when fit is false, and must be omitted when fit is true. A different feature prompt of at least 80 characters that would fit this project better.
 
 Be honest and discriminating; do not force a fit and do not claim integrations or persistence that are absent from the context. Return only JSON matching the schema.`;
 }

@@ -198,7 +198,11 @@ export async function getSuggestions(project, { mock = false, mode = 'balanced',
   }
 }
 
-const ASK_SCHEMA = { type: 'object', additionalProperties: false, required: ['fit', 'reasoning'], properties: { fit: { type: 'boolean' }, reasoning: { type: 'string', minLength: 10, maxLength: 500 }, prompt: { type: 'string', minLength: 80 }, alternative: { type: 'string', minLength: 80 } } };
+// Two mutually exclusive shapes (rather than one shape with optional fields) so a strict
+// JSON-schema model can't satisfy the schema while silently omitting "prompt" or "alternative".
+const ASK_SCHEMA_FIT = { type: 'object', additionalProperties: false, required: ['fit', 'reasoning', 'prompt'], properties: { fit: { type: 'boolean', enum: [true] }, reasoning: { type: 'string', minLength: 10, maxLength: 500 }, prompt: { type: 'string', minLength: 80 } } };
+const ASK_SCHEMA_MISFIT = { type: 'object', additionalProperties: false, required: ['fit', 'reasoning', 'alternative'], properties: { fit: { type: 'boolean', enum: [false] }, reasoning: { type: 'string', minLength: 10, maxLength: 500 }, alternative: { type: 'string', minLength: 80 } } };
+const ASK_SCHEMA = { anyOf: [ASK_SCHEMA_FIT, ASK_SCHEMA_MISFIT] };
 
 function askSystemPrompt() {
   return `You are a senior product engineer evaluating a feature idea against a project's codebase. Analyze the supplied project context and determine whether the proposed feature is a good fit.
@@ -206,8 +210,8 @@ function askSystemPrompt() {
 Return a JSON object with:
 - fit: true if the feature makes sense for this project's architecture, tech stack, and purpose; false otherwise.
 - reasoning: 1-2 sentences explaining your assessment. If it doesn't fit, acknowledge the feature is a good idea in general but explain why it doesn't match this specific project.
-- prompt: if fit is true, a complete actionable coding prompt (at least 80 characters) describing scope, relevant existing context, expected behavior, edge cases, and validation. Do not include if fit is false.
-- alternative: if fit is false, suggest a different feature prompt (at least 80 characters) that would be a better fit for this project. Do not include if fit is true.
+- prompt: ALWAYS required when fit is true, and must be omitted when fit is false. A complete actionable coding prompt (at least 80 characters) describing scope, relevant existing context, expected behavior, edge cases, and validation.
+- alternative: ALWAYS required when fit is false, and must be omitted when fit is true. A different feature prompt (at least 80 characters) that would be a better fit for this project.
 
 Be honest. Do not force a fit. Return only JSON matching the schema.`;
 }

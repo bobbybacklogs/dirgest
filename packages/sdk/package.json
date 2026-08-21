@@ -1,6 +1,6 @@
 {
   "name": "@dirgest/sdk",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Context-aware project suggestion engine",
   "type": "module",
   "keywords": [
