@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { attemptWithCandidateModels, createModelSession } from './suggestions.js';
+import { attemptWithCandidateModels, buildCorrectionMessages, createModelSession } from './suggestions.js';
 import { readHistory, formatHistoryForPrompt } from './history.js';
 
 export const FEATURE_FILE_EXTENSIONS = ['.txt', '.md'];
@@ -288,15 +288,16 @@ export async function reviewFeatures(project, features, { mock = false, environm
     let preferredModel;
     for (const batch of chunk(deduped, REVIEW_BATCH_SIZE)) {
       const messages = buildReviewMessages(project, batch, historyContext);
-      const task = (candidateModel) => hitch.chat({ provider, model: candidateModel, messages, responseFormat: { type: 'json_schema', name: 'dirgest_feature_review', schema: REVIEW_SCHEMA, strict: true } }, credentials);
+      const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_feature_review', schema: REVIEW_SCHEMA, strict: true } }, credentials);
       const batchCandidates = preferredModel ? [preferredModel, ...candidates.filter((candidate) => candidate !== preferredModel)] : candidates;
       const { model: successfulModel, result } = await attemptWithCandidateModels(task, batchCandidates);
       preferredModel = successfulModel;
+      const content = result.message?.content;
       try {
-        reviews.push(...validateFeatureReview(parseReviewContent(result.message?.content), batch));
+        reviews.push(...validateFeatureReview(parseReviewContent(content), batch));
       } catch (error) {
         if (!error.message.startsWith('Review response') && !error.message.startsWith('Model returned')) throw error;
-        const corrected = await task(successfulModel);
+        const corrected = await task(successfulModel, buildCorrectionMessages(content, error));
         reviews.push(...validateFeatureReview(parseReviewContent(corrected.message?.content), batch));
       }
     }

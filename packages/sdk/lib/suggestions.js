@@ -47,6 +47,17 @@ function parseContent(content) {
   try { return JSON.parse(content); } catch { throw new Error('Model returned invalid JSON; try again or use --mock.'); }
 }
 
+/**
+ * Feed a model its own invalid response plus the specific validation failure so a retry has a
+ * real chance of fixing the problem instead of reproducing the same mistake.
+ */
+export function buildCorrectionMessages(rawContent, error) {
+  return [
+    { role: 'assistant', content: typeof rawContent === 'string' ? rawContent : '' },
+    { role: 'user', content: `Your previous response was invalid: ${error.message} Return a corrected JSON object only, strictly matching the schema, making sure every field meets its minimum length requirement.` }
+  ];
+}
+
 function hasConfiguredCredential(provider, environment) {
   const names = [provider.apiKeyEnvVar, ...(provider.apiKeyEnvFallbacks || [])].filter(Boolean);
   return names.some((name) => Boolean(environment[name]?.trim()));
@@ -170,14 +181,14 @@ export async function getSuggestions(project, { mock = false, mode = 'balanced',
   const { provider, credentials } = configuration;
   try {
     const messages = buildSuggestionMessages(project, mode, historyContext);
-    const task = (candidateModel) => hitch.chat({ provider, model: candidateModel, messages, responseFormat: { type: 'json_schema', name: 'dirgest_suggestions', schema: FEATURE_SCHEMA, strict: true } }, credentials);
+    const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_suggestions', schema: FEATURE_SCHEMA, strict: true } }, credentials);
     const { model: successfulModel, result } = await attemptWithCandidateModels(task, candidates);
     const content = result.message?.content;
     try {
       return validateSuggestions(parseContent(content));
     } catch (error) {
       if (!error.message.startsWith('Model response') && !error.message.startsWith('Model returned') && !error.message.startsWith('Suggestion ')) throw error;
-      const corrected = await task(successfulModel);
+      const corrected = await task(successfulModel, buildCorrectionMessages(content, error));
       return validateSuggestions(parseContent(corrected.message?.content));
     }
   } catch (error) {
@@ -231,14 +242,14 @@ export async function getAskResponse(project, question, { mock = false, environm
   const { provider, credentials } = configuration;
   try {
     const messages = buildAskMessages(project, question, historyContext);
-    const task = (candidateModel) => hitch.chat({ provider, model: candidateModel, messages, responseFormat: { type: 'json_schema', name: 'dirgest_ask', schema: ASK_SCHEMA, strict: true } }, credentials);
+    const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_ask', schema: ASK_SCHEMA, strict: true } }, credentials);
     const { model: successfulModel, result } = await attemptWithCandidateModels(task, candidates);
     const content = result.message?.content;
     try {
       return validateAskResponse(parseContent(content));
     } catch (error) {
       if (!error.message.startsWith('Ask response')) throw error;
-      const corrected = await task(successfulModel);
+      const corrected = await task(successfulModel, buildCorrectionMessages(content, error));
       return validateAskResponse(parseContent(corrected.message?.content));
     }
   } catch (error) {
