@@ -5,6 +5,40 @@ export function renderHeader(project) {
   const context = project.crawl ? 'Feature suggestions based on a broad directory crawl' : 'Feature suggestions based on a bounded local project sample';
   return `\n${color(ANSI.bold + ANSI.cyan, project.name)} ${color(ANSI.dim, '|')} ${color(ANSI.dim, project.directory)}\n${color(ANSI.dim, context)}`;
 }
+export function renderInspection(project) {
+  const files = project.files.map((file) => file.path);
+  const configFiles = files.filter((file) => /(^|[\\/])(package\.json|tsconfig\.json|vite\.config\.|webpack\.config\.|rollup\.config\.|next\.config\.|nuxt\.config\.|dockerfile|makefile|cargo\.toml|go\.mod|pyproject\.toml|requirements\.txt|composer\.json|firebase\.json|apphosting\.yaml)([.]|$)/i.test(file));
+  const testFiles = files.filter((file) => /[.]((test|spec|e2e)[.])|(^|[\\/])tests?([\\/]|$)/i.test(file));
+  const lines = [
+    `\n${color(ANSI.bold + ANSI.cyan, project.name)} ${color(ANSI.dim, '|')} ${color(ANSI.dim, project.directory)}`,
+    `\n${color(ANSI.bold, 'Tech stack')}`,
+    `  Type: ${project.detectedProjectType || 'Not detected'}`,
+    `  Language: ${project.detectedLanguage || 'Not detected'}`,
+    `  Framework: ${project.detectedFramework || 'Not detected'}`,
+    `\n${color(ANSI.bold, 'Project signals')}`,
+    `  Files scanned: ${project.metadata.fileCount}${project.crawl ? ` of ${project.metadata.discoveredFileCount} discovered` : ''}`,
+    `  Entry points: ${project.entryPoints.length ? project.entryPoints.join(', ') : 'None detected'}`,
+    `  Config files: ${configFiles.length ? configFiles.join(', ') : 'None detected'}`,
+    `  Tests: ${testFiles.length ? `${testFiles.length} test file${testFiles.length === 1 ? '' : 's'} found` : 'No test files detected'}`,
+  ];
+
+  if (project.metadata.packageName || project.metadata.description) {
+    lines.push(`\n${color(ANSI.bold, 'Package metadata')}`);
+    if (project.metadata.packageName) lines.push(`  Name: ${project.metadata.packageName}`);
+    if (project.metadata.description) lines.push(`  Description: ${project.metadata.description}`);
+  }
+  if (project.metadata.scripts.length) lines.push(`  Scripts: ${project.metadata.scripts.join(', ')}`);
+  if (project.dependencies.runtime.length || project.dependencies.dev.length) {
+    lines.push(`\n${color(ANSI.bold, 'Dependencies')}`);
+    if (project.dependencies.runtime.length) lines.push(`  Runtime: ${project.dependencies.runtime.join(', ')}`);
+    if (project.dependencies.dev.length) lines.push(`  Development: ${project.dependencies.dev.join(', ')}`);
+    if (project.dependencies.firebase.length) lines.push(`  Firebase: ${project.dependencies.firebase.join(', ')}`);
+    if (project.dependencies.aws.length) lines.push(`  AWS: ${project.dependencies.aws.join(', ')}`);
+    if (project.dependencies.ai.length) lines.push(`  AI: ${project.dependencies.ai.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}
 export function renderSuggestions(suggestions) { return `\n${suggestions.map((suggestion, index) => `  ${color(ANSI.green, String(index + 1).padStart(2, ' '))}  ${color(ANSI.bold, suggestion.title)}`).join('\n')}\n\n${color(ANSI.dim, 'Choose 1-6 for a full coding prompt, a for all prompts, q to exit.')}`; }
 export function renderPrompts(suggestions, startIndex = 0) { return suggestions.map((suggestion, index) => `${color(ANSI.bold + ANSI.cyan, `${startIndex + index + 1}. ${suggestion.title}`)}\n${suggestion.prompt}`).join('\n\n'); }
 export function renderError(message) { return color(ANSI.red, `dirgest: ${message}`); }
