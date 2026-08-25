@@ -5,8 +5,47 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { isNewerVersion, maybeUpdate } from '../lib/update.js';
 
 const packageDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+test('update checks compare stable semantic versions', () => {
+  assert.equal(isNewerVersion('0.2.5', '0.2.6'), true);
+  assert.equal(isNewerVersion('0.2.5', '0.2.5'), false);
+  assert.equal(isNewerVersion('0.2.5', '0.2.4'), false);
+  assert.equal(isNewerVersion('0.2.5', 'latest'), false);
+});
+
+test('update check prompts and restarts only when npm has a newer version', async () => {
+  const input = { isTTY: true };
+  const output = { isTTY: true };
+  let prompted = false;
+  let updatedVersion = '';
+  const result = await maybeUpdate({
+    input,
+    output,
+    env: {},
+    fetchImpl: async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '0.2.7' } }) }),
+    prompt: async (_input, _output, version) => { prompted = true; return version === '0.2.7'; },
+    update: (version) => { updatedVersion = version; return { restarted: true, status: 0 }; },
+  });
+
+  assert.equal(prompted, true);
+  assert.equal(updatedVersion, '0.2.7');
+  assert.deepEqual(result, { restarted: true, status: 0 });
+});
+
+test('update check is skipped for non-interactive terminals', async () => {
+  let fetched = false;
+  const result = await maybeUpdate({
+    input: { isTTY: false },
+    output: { isTTY: false },
+    fetchImpl: async () => { fetched = true; return { ok: true, json: async () => ({}) }; },
+  });
+
+  assert.equal(result, null);
+  assert.equal(fetched, false);
+});
 
 test('--crawl builds broad context before generating offline suggestions', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'dirgest-cli-'));

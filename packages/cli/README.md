@@ -14,9 +14,12 @@ dirgest --suggest                      # 4-6 balanced ideas
 dirgest --suggest growth               # or: ux · technical · wild
 dirgest --ask "add a dark mode toggle" # does this idea fit?
 dirgest --review roadmap.md            # score a whole feature list
+dirgest --inspect                      # report stack, configs, scripts, and tests
 dirgest --suggest --crawl              # widen the context first
 dirgest --mock                         # offline, no API key needed
 ```
+
+When run in an interactive terminal, dirgest checks npm for a newer CLI release. If one is available, it asks before installing the latest version globally and restarting the original command. Use `--no-update`, or set `DIRGEST_SKIP_UPDATE_CHECK=1`, to skip the check.
 
 Set any supported provider key (`OPENAI_API_KEY`, `GROQ_API_KEY`, …) and dirgest works out the rest.
 

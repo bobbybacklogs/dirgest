@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory } from '@dirgest/sdk';
 import { promptForSelection } from '../lib/selection.js';
 import { browseSuggestions, renderAskResponse, renderError, renderFeatureReview, renderHeader, renderHistory, renderInspection, renderPrompts, renderSuggestions } from '../lib/ui.js';
+import { maybeUpdate } from '../lib/update.js';
 
 const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number);
 const canUseOpenTui = nodeMajor > 26 || (nodeMajor === 26 && nodeMinor >= 4);
@@ -39,11 +40,12 @@ Options:
        --clear-history    Clear suggestion history
        --crawl            Build a broader cross-directory project context
        --mock             Run deterministic offline suggestions
+          --no-update        Skip the npm update check for this run
   -h, --help             Show this help message
 `;
 
 function parseArguments(argumentsList) {
-  const options = { directory: process.cwd(), mock: false, crawl: false, inspect: false, suggest: false, suggestionMode: 'balanced', help: false, ask: false, askQuestion: '', review: false, reviewFile: '', history: false, clearHistory: false };
+      const options = { directory: process.cwd(), mock: false, crawl: false, noUpdate: false, inspect: false, suggest: false, suggestionMode: 'balanced', help: false, ask: false, askQuestion: '', review: false, reviewFile: '', history: false, clearHistory: false };
   for (let index = 0; index < argumentsList.length; index += 1) {
     const argument = argumentsList[index];
     if (argument === '-d' || argument === '--dir') {
@@ -79,6 +81,8 @@ function parseArguments(argumentsList) {
       options.mock = true;
     } else if (argument === '--crawl') {
       options.crawl = true;
+    } else if (argument === '--no-update') {
+      options.noUpdate = true;
     } else if (argument === '--history') {
       options.history = true;
     } else if (argument === '--clear-history') {
@@ -120,6 +124,18 @@ async function main() {
     process.stderr.write(`${renderError('Choose --inspect, --suggestions, --suggest, --ask, --review, --history, or --clear-history.')}\n\n${help}`);
     process.exitCode = 2;
     return;
+  }
+
+  if (!options.noUpdate) {
+    try {
+      const updateResult = await maybeUpdate();
+      if (updateResult) {
+        process.exitCode = updateResult.status;
+        return;
+      }
+    } catch {
+      // Update checks must never prevent the requested command from running.
+    }
   }
 
   try {
