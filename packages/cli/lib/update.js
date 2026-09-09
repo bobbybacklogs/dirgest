@@ -45,10 +45,24 @@ async function promptForUpdate(input, output, latestVersion) {
   return /^y(?:es)?$/i.test(answer.trim());
 }
 
+/**
+ * Build the spawn invocation for a global npm install.
+ * Windows needs `shell: true` for `.cmd` shims; without it Node returns EINVAL and the update is a no-op.
+ */
+export function buildNpmInstallSpawn(version, { platform = process.platform } = {}) {
+  const args = ['install', '--global', `${packageMetadata.name}@${version}`];
+  if (platform === 'win32') {
+    return { command: 'npm', args, options: { stdio: 'inherit', shell: true } };
+  }
+  return { command: 'npm', args, options: { stdio: 'inherit' } };
+}
+
 export function installAndRestart(version, { spawn = spawnSync, execPath = process.execPath, argv = process.argv.slice(1), env = process.env, platform = process.platform } = {}) {
-  const npmCommand = platform === 'win32' ? 'npm.cmd' : 'npm';
-  const installResult = spawn(npmCommand, ['install', '--global', `${packageMetadata.name}@${version}`], { stdio: 'inherit' });
-  if (installResult.status !== 0) return { restarted: false, status: installResult.status ?? 1 };
+  const { command, args, options } = buildNpmInstallSpawn(version, { platform });
+  const installResult = spawn(command, args, { ...options, env });
+  if (installResult.error || installResult.status !== 0) {
+    return { restarted: false, status: installResult.status ?? 1, error: installResult.error };
+  }
   const restartResult = spawn(execPath, argv, {
     stdio: 'inherit',
     env: { ...env, DIRGEST_SKIP_UPDATE_CHECK: '1' },

@@ -129,9 +129,12 @@ async function main() {
   if (!options.noUpdate) {
     try {
       const updateResult = await maybeUpdate();
-      if (updateResult) {
+      if (updateResult?.restarted) {
         process.exitCode = updateResult.status;
         return;
+      }
+      if (updateResult && !updateResult.restarted) {
+        process.stderr.write('dirgest: automatic update failed; continuing with the installed version.\n');
       }
     } catch {
       // Update checks must never prevent the requested command from running.

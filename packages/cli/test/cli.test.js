@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { isNewerVersion, maybeUpdate } from '../lib/update.js';
+import { isNewerVersion, maybeUpdate, buildNpmInstallSpawn } from '../lib/update.js';
 
 const packageDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -14,6 +14,13 @@ test('update checks compare stable semantic versions', () => {
   assert.equal(isNewerVersion('0.2.5', '0.2.5'), false);
   assert.equal(isNewerVersion('0.2.5', '0.2.4'), false);
   assert.equal(isNewerVersion('0.2.5', 'latest'), false);
+});
+
+test('Windows npm install spawn uses shell so .cmd shims work', () => {
+  const windows = buildNpmInstallSpawn('0.2.9', { platform: 'win32' });
+  assert.deepEqual(windows, { command: 'npm', args: ['install', '--global', '@dirgest/cli@0.2.9'], options: { stdio: 'inherit', shell: true } });
+  const unix = buildNpmInstallSpawn('0.2.9', { platform: 'linux' });
+  assert.deepEqual(unix, { command: 'npm', args: ['install', '--global', '@dirgest/cli@0.2.9'], options: { stdio: 'inherit' } });
 });
 
 test('update check prompts and restarts only when npm has a newer version', async () => {
@@ -25,13 +32,13 @@ test('update check prompts and restarts only when npm has a newer version', asyn
     input,
     output,
     env: {},
-    fetchImpl: async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '0.2.9' } }) }),
-    prompt: async (_input, _output, version) => { prompted = true; return version === '0.2.9'; },
+    fetchImpl: async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '0.3.0' } }) }),
+    prompt: async (_input, _output, version) => { prompted = true; return version === '0.3.0'; },
     update: (version) => { updatedVersion = version; return { restarted: true, status: 0 }; },
   });
 
   assert.equal(prompted, true);
-  assert.equal(updatedVersion, '0.2.9');
+  assert.equal(updatedVersion, '0.3.0');
   assert.deepEqual(result, { restarted: true, status: 0 });
 });
 
