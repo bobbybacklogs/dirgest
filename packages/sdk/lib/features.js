@@ -309,7 +309,7 @@ export async function reviewFeatures(project, features, { mock = false, environm
     let preferredModel;
     for (const batch of chunk(deduped, REVIEW_BATCH_SIZE)) {
       const messages = buildReviewMessages(project, batch, historyContext);
-      const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_feature_review', schema: REVIEW_SCHEMA, strict: true } }, credentials);
+      const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_feature_review', schema: REVIEW_SCHEMA, strict: true }, ...(credentials?.apiKey ? { apiKey: credentials.apiKey } : {}), ...(credentials?.baseUrl ? { baseUrl: credentials.baseUrl } : {}) });
       const batchCandidates = preferredModel ? [preferredModel, ...candidates.filter((candidate) => candidate !== preferredModel)] : candidates;
       const { model: successfulModel, result } = await attemptWithCandidateModels(task, batchCandidates);
       preferredModel = successfulModel;

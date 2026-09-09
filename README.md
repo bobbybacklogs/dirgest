@@ -119,12 +119,12 @@ dirgest --suggest
 
 <br>
 
-Dirgest pins `modelhitch@0.14.0` and calls it directly via `new ModelHitch().chat()`.
+Dirgest depends on `modelhitch@^2.0.0` and calls it via `new ModelHitch({ autoMode: true }).chat()`.
 
-1. **Configured provider first.** Dirgest scans ModelHitch's providers for a configured API-key env var (including fallbacks) and uses the first one it finds.
-2. **Avoids the free-tier default.** ModelHitch's demo default `big-pickle` is heavily rate-limited, so an auto-detected `opencode-zen` provider gets `deepseek-v4-flash` instead. Other providers keep their native default (`openai` → `gpt-4o-mini`, `groq` → `llama-3.3-70b-versatile`).
-3. **Local bridge fallback.** With no direct credential, dirgest probes `http://127.0.0.1:3939` and, if healthy, picks the first advertised model from `deepseek-v4-flash` → `gpt-5.6-luna` → `gpt-5.4-mini` → `gpt-5.4-nano` → `claude-haiku-4-5` → `gemini-3.5-flash-lite`.
-4. **Retry on failure.** Any retryable error (`rate-limited`, upstream `provider-error`, HTTP 429/5xx) rotates to the next candidate model. Explicit overrides stay first in line.
+1. **Configured provider first.** Dirgest scans ModelHitch's providers for a configured API-key env var (including fallbacks, and V2's private OpenAI-compatible `config` fields) and uses the first one it finds — typically `AI_GATEWAY_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / etc.
+2. **Avoids rate-limited free-tier defaults.** Auto-detected OpenRouter free defaults and legacy `big-pickle` models are rewritten to sturdier defaults. Other providers keep their native default (`openai` → `gpt-4o-mini`, `vercel-ai-gateway` → `openai/gpt-5.4`, `groq` → `llama-3.3-70b-versatile`).
+3. **Local bridge fallback.** With no direct credential, dirgest probes `http://127.0.0.1:3939` and, if healthy, picks the first advertised model from a preference list (including V2 `provider/model` ids).
+4. **Retry on failure.** Dirgest still rotates bridge candidates on retryable errors. Direct providers also get ModelHitch `autoMode` failover across lanes for 429/5xx/network failures.
 
 Dirgest never prints env values or API keys.
 

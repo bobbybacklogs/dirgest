@@ -62,15 +62,48 @@ export function buildCorrectionMessages(rawContent, error) {
   ];
 }
 
+/**
+ * ModelHitch V2 keeps OpenAI-compatible credential env names on the private
+ * `config` object; Anthropic (and older test stubs) expose them on the provider.
+ */
+function providerCredentialEnvNames(provider) {
+  const primary = provider.apiKeyEnvVar ?? provider.config?.apiKeyEnvVar;
+  const fallbacks = provider.apiKeyEnvFallbacks ?? provider.config?.apiKeyEnvFallbacks ?? [];
+  return [primary, ...fallbacks].filter(Boolean);
+}
+
 function hasConfiguredCredential(provider, environment) {
-  const names = [provider.apiKeyEnvVar, ...(provider.apiKeyEnvFallbacks || [])].filter(Boolean);
-  return names.some((name) => Boolean(environment[name]?.trim()));
+  return providerCredentialEnvNames(provider).some((name) => Boolean(environment[name]?.trim()));
 }
 
 const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:3939';
-const MODELHITCH_FREE_TIER_DEFAULT = 'big-pickle';
-const PREFERRED_OPENCODE_ZEN_MODEL = 'deepseek-v4-flash';
-const BRIDGE_MODEL_PREFERENCES = ['deepseek-v4-flash', 'gpt-5.6-luna', 'gpt-5.4-mini', 'gpt-5.4-nano', 'claude-haiku-4-5', 'gemini-3.5-flash-lite', 'big-pickle'];
+/** Free / demo defaults that are commonly rate-limited; prefer a sturdier model when auto-detecting. */
+const RATE_LIMITED_DEFAULT_MODELS = new Map([
+  ['big-pickle', 'deepseek-v4-flash'],
+  ['meta-llama/llama-3.1-8b-instruct:free', 'openai/gpt-4o-mini'],
+]);
+const BRIDGE_MODEL_PREFERENCES = [
+  'deepseek-v4-flash',
+  'openai/gpt-4o-mini',
+  'openai/gpt-5.4-mini',
+  'gpt-5.6-luna',
+  'gpt-5.4-mini',
+  'gpt-5.4-nano',
+  'anthropic/claude-haiku-4-5',
+  'claude-haiku-4-5',
+  'gemini-3.5-flash-lite',
+  'big-pickle',
+  'mock/mock-model',
+];
+
+function createHitch() {
+  return new ModelHitch({ autoMode: true });
+}
+
+function safeDefaultModel(providerDefault) {
+  if (!providerDefault) return 'gpt-4o-mini';
+  return RATE_LIMITED_DEFAULT_MODELS.get(providerDefault) || providerDefault;
+}
 
 export function resolveBridgeConfiguration(catalog, environment = process.env) {
   const models = Array.isArray(catalog?.data) ? catalog.data : [];
@@ -133,9 +166,7 @@ export function resolveModelConfiguration(hitch, environment = process.env) {
   const configuredProvider = hitch.providers.find((provider) => hasConfiguredCredential(provider, environment));
   const provider = environment.DIRGEST_PROVIDER || configuredProvider?.id || 'openai';
   const selectedProvider = hitch.providers.find((candidate) => candidate.id === provider);
-  const providerDefault = selectedProvider?.defaultModel || 'gpt-4o-mini';
-  const safeDefault = providerDefault === MODELHITCH_FREE_TIER_DEFAULT ? PREFERRED_OPENCODE_ZEN_MODEL : providerDefault;
-  const model = environment.DIRGEST_MODEL || safeDefault;
+  const model = environment.DIRGEST_MODEL || safeDefaultModel(selectedProvider?.defaultModel);
   return { provider, model, usesModelHitchConfiguration: Boolean(configuredProvider && !environment.DIRGEST_PROVIDER) };
 }
 
@@ -150,16 +181,16 @@ async function resolveProviderCandidates(hitch, environment = process.env) {
     }
   }
   const { provider, usesModelHitchConfiguration, credentials } = configuration;
-  if (provider === 'openai' && !environment.OPENAI_API_KEY && !usesModelHitchConfiguration) throw new Error('No ModelHitch provider configuration was found. Set a supported provider API key, set DIRGEST_PROVIDER, or use --mock for offline mode.');
+  if (provider === 'openai' && !environment.OPENAI_API_KEY && !usesModelHitchConfiguration) throw new Error('No ModelHitch provider configuration was found. Set a supported provider API key (for example OPENAI_API_KEY or AI_GATEWAY_API_KEY), set DIRGEST_PROVIDER, or use --mock for offline mode.');
   const candidates = credentials?.baseUrl
     ? dedupeModels([configuration.model, ...bridgeCandidates])
-    : (provider === 'opencode-zen' ? dedupeModels([configuration.model, ...BRIDGE_MODEL_PREFERENCES]) : [configuration.model]);
+    : [configuration.model];
   return { configuration, candidates };
 }
 
 // Shared entry point so every SDK capability resolves providers and fallback models identically.
 export async function createModelSession(environment = process.env) {
-  const hitch = new ModelHitch();
+  const hitch = createHitch();
   const { configuration, candidates } = await resolveProviderCandidates(hitch, environment);
   return { hitch, configuration, candidates };
 }
@@ -180,12 +211,12 @@ export async function getSuggestions(project, { mock = false, mode = 'balanced',
   if (mock) return mockSuggestions(project, mode);
   const history = await readHistory(project.directory);
   const historyContext = formatHistoryForPrompt(history);
-  const hitch = new ModelHitch();
+  const hitch = createHitch();
   const { configuration, candidates } = await resolveProviderCandidates(hitch, environment);
   const { provider, credentials } = configuration;
   try {
     const messages = buildSuggestionMessages(project, mode, historyContext);
-    const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_suggestions', schema: FEATURE_SCHEMA, strict: true } }, credentials);
+    const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_suggestions', schema: FEATURE_SCHEMA, strict: true }, ...(credentials?.apiKey ? { apiKey: credentials.apiKey } : {}), ...(credentials?.baseUrl ? { baseUrl: credentials.baseUrl } : {}) });
     const { model: successfulModel, result } = await attemptWithCandidateModels(task, candidates);
     const content = result.message?.content;
     try {
@@ -245,12 +276,12 @@ export async function getAskResponse(project, question, { mock = false, environm
   if (mock) return mockAskResponse(project, question);
   const history = await readHistory(project.directory);
   const historyContext = formatHistoryForPrompt(history);
-  const hitch = new ModelHitch();
+  const hitch = createHitch();
   const { configuration, candidates } = await resolveProviderCandidates(hitch, environment);
   const { provider, credentials } = configuration;
   try {
     const messages = buildAskMessages(project, question, historyContext);
-    const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_ask', schema: ASK_SCHEMA, strict: true } }, credentials);
+    const task = (candidateModel, extraMessages = []) => hitch.chat({ provider, model: candidateModel, messages: [...messages, ...extraMessages], responseFormat: { type: 'json_schema', name: 'dirgest_ask', schema: ASK_SCHEMA, strict: true }, ...(credentials?.apiKey ? { apiKey: credentials.apiKey } : {}), ...(credentials?.baseUrl ? { baseUrl: credentials.baseUrl } : {}) });
     const { model: successfulModel, result } = await attemptWithCandidateModels(task, candidates);
     const content = result.message?.content;
     try {

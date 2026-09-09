@@ -14,6 +14,16 @@ test('validateSuggestions rejects a prompt reused across different suggestions',
 test('mock suggestions use strict 3-4 word titles for every mode', async () => { for (const mode of ['balanced', 'growth', 'ux', 'technical', 'wild']) { const suggestions = await getSuggestions({ name: 'dirgest' }, { mock: true, mode }); assert.equal(suggestions.length, 5); for (const suggestion of suggestions) assert.ok(suggestion.title.split(/\s+/).length >= 3 && suggestion.title.split(/\s+/).length <= 4, `${mode}: ${suggestion.title}`); } });
 test('suggestion modes produce distinct deterministic ideas', async () => { const project = { name: 'dirgest' }; const balanced = await getSuggestions(project, { mock: true }); const growth = await getSuggestions(project, { mock: true, mode: 'growth' }); assert.notDeepEqual(growth, balanced); await assert.rejects(getSuggestions(project, { mock: true, mode: 'invalid' }), /Unknown suggestion mode/); });
 test('ModelHitch credential configuration is preferred over the default provider', () => { const hitch = { providers: [{ id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' }, { id: 'groq', defaultModel: 'llama-3.3-70b-versatile', apiKeyEnvVar: 'GROQ_API_KEY' }] }; assert.deepEqual(resolveModelConfiguration(hitch, { GROQ_API_KEY: 'configured-key' }), { provider: 'groq', model: 'llama-3.3-70b-versatile', usesModelHitchConfiguration: true }); });
+test('ModelHitch V2 OpenAI-compatible providers expose credentials via config', () => {
+  const hitch = {
+    providers: [
+      { id: 'vercel-ai-gateway', defaultModel: 'openai/gpt-5.4', config: { apiKeyEnvVar: 'AI_GATEWAY_API_KEY', apiKeyEnvFallbacks: ['VERCEL_OIDC_TOKEN', 'VERCEL_TOKEN'] } },
+      { id: 'openai', defaultModel: 'gpt-4o-mini', config: { apiKeyEnvVar: 'OPENAI_API_KEY' } }
+    ]
+  };
+  assert.deepEqual(resolveModelConfiguration(hitch, { AI_GATEWAY_API_KEY: 'gateway-key' }), { provider: 'vercel-ai-gateway', model: 'openai/gpt-5.4', usesModelHitchConfiguration: true });
+  assert.deepEqual(resolveModelConfiguration(hitch, { OPENAI_API_KEY: 'openai-key' }), { provider: 'openai', model: 'gpt-4o-mini', usesModelHitchConfiguration: true });
+});
 test('dirgest model overrides win and no ModelHitch configuration preserves OpenAI defaults', () => { const hitch = { providers: [{ id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' }, { id: 'groq', defaultModel: 'llama-3.3-70b-versatile', apiKeyEnvVar: 'GROQ_API_KEY' }] }; assert.deepEqual(resolveModelConfiguration(hitch, {}), { provider: 'openai', model: 'gpt-4o-mini', usesModelHitchConfiguration: false }); assert.deepEqual(resolveModelConfiguration(hitch, { GROQ_API_KEY: 'configured-key', DIRGEST_PROVIDER: 'openai', DIRGEST_MODEL: 'gpt-4.1-mini' }), { provider: 'openai', model: 'gpt-4.1-mini', usesModelHitchConfiguration: false }); });
 test('bridge model configuration gives the global override precedence', () => { const catalog = { data: [{ id: 'other-model' }, { id: 'big-pickle' }] }; assert.equal(resolveBridgeConfiguration(catalog, { DIRGEST_MODEL: 'explicit-model', DIRGEST_BRIDGE_MODEL: 'bridge-model' }).model, 'explicit-model'); assert.equal(resolveBridgeConfiguration(catalog, { DIRGEST_BRIDGE_MODEL: 'bridge-model' }).model, 'bridge-model'); assert.deepEqual(resolveBridgeConfiguration(catalog, {}), { provider: 'openai', model: 'big-pickle', credentials: { apiKey: 'sk-bridge-local', baseUrl: 'http://127.0.0.1:3939/v1' }, usesModelHitchConfiguration: true }); assert.equal(resolveBridgeConfiguration({ data: [] }, {}), null); });
 test('bridge model preference picks a reliable model before the rate-limited free-tier default', () => {
@@ -21,16 +31,18 @@ test('bridge model preference picks a reliable model before the rate-limited fre
   assert.deepEqual(resolveBridgeConfiguration(catalog, {}), { provider: 'openai', model: 'deepseek-v4-flash', credentials: { apiKey: 'sk-bridge-local', baseUrl: 'http://127.0.0.1:3939/v1' }, usesModelHitchConfiguration: true });
   assert.equal(resolveBridgeConfiguration({ data: [{ id: 'only-random-model' }] }, {}).model, 'only-random-model');
 });
-test('resolveModelConfiguration avoids the rate-limited free-tier default for opencode-zen', () => {
+test('resolveModelConfiguration avoids rate-limited free-tier defaults', () => {
   const hitch = {
     providers: [
-      { id: 'opencode-zen', defaultModel: 'big-pickle', apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY' },
-      { id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' }
+      { id: 'openrouter', defaultModel: 'meta-llama/llama-3.1-8b-instruct:free', apiKeyEnvVar: 'OPENROUTER_API_KEY' },
+      { id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' },
+      { id: 'vercel-ai-gateway', defaultModel: 'openai/gpt-5.4', apiKeyEnvVar: 'AI_GATEWAY_API_KEY', apiKeyEnvFallbacks: ['VERCEL_OIDC_TOKEN', 'VERCEL_TOKEN'] }
     ]
   };
-  assert.deepEqual(resolveModelConfiguration(hitch, { OPENCODE_ZEN_API_KEY: 'configured-key' }), { provider: 'opencode-zen', model: 'deepseek-v4-flash', usesModelHitchConfiguration: true });
+  assert.deepEqual(resolveModelConfiguration(hitch, { OPENROUTER_API_KEY: 'configured-key' }), { provider: 'openrouter', model: 'openai/gpt-4o-mini', usesModelHitchConfiguration: true });
   assert.deepEqual(resolveModelConfiguration(hitch, { OPENAI_API_KEY: 'configured-key' }), { provider: 'openai', model: 'gpt-4o-mini', usesModelHitchConfiguration: true });
-  assert.deepEqual(resolveModelConfiguration(hitch, { OPENCODE_ZEN_API_KEY: 'configured-key', DIRGEST_MODEL: 'explicit-model' }), { provider: 'opencode-zen', model: 'explicit-model', usesModelHitchConfiguration: true });
+  assert.deepEqual(resolveModelConfiguration(hitch, { AI_GATEWAY_API_KEY: 'configured-key' }), { provider: 'vercel-ai-gateway', model: 'openai/gpt-5.4', usesModelHitchConfiguration: true });
+  assert.deepEqual(resolveModelConfiguration(hitch, { OPENROUTER_API_KEY: 'configured-key', DIRGEST_MODEL: 'explicit-model' }), { provider: 'openrouter', model: 'explicit-model', usesModelHitchConfiguration: true });
 });
 test('bridgeModelCandidates returns ordered preferences and falls back to the first advertised model', () => {
   const catalog = { data: [{ id: 'random-1' }, { id: 'gpt-5.4-nano' }, { id: 'gpt-5.6-luna' }] };
@@ -42,17 +54,17 @@ test('model fallback advances on retryable errors and uses the first succeeding 
   const calls = [];
   const { model, result } = await attemptWithCandidateModels(async (candidateModel) => {
     calls.push(candidateModel);
-    if (candidateModel === 'deepseek-v4-flash') throw new ModelHitchError('rate-limited', 'Provider "opencode-zen" rate limited the request.', { providerId: 'opencode-zen' });
+    if (candidateModel === 'deepseek-v4-flash') throw new ModelHitchError('rate-limited', 'Provider "openrouter" rate limited the request.', { providerId: 'openrouter' });
     return { ok: true, model: candidateModel };
   }, ['deepseek-v4-flash', 'gpt-5.6-luna']);
   assert.deepEqual({ model, result }, { model: 'gpt-5.6-luna', result: { ok: true, model: 'gpt-5.6-luna' } });
   assert.deepEqual(calls, ['deepseek-v4-flash', 'gpt-5.6-luna']);
 });
 test('model fallback throws the last retryable error when every candidate fails', async () => {
-  await assert.rejects(attemptWithCandidateModels(async () => { throw new ModelHitchError('provider-error', 'Upstream request failed: Endpoint is unavailable.', { providerId: 'opencode-zen', status: 503 }); }, ['deepseek-v4-flash', 'gpt-5.6-luna']), (error) => error.code === 'provider-error' && error.message.includes('Endpoint is unavailable'));
+  await assert.rejects(attemptWithCandidateModels(async () => { throw new ModelHitchError('provider-error', 'Upstream request failed: Endpoint is unavailable.', { providerId: 'openrouter', status: 503 }); }, ['deepseek-v4-flash', 'gpt-5.6-luna']), (error) => error.code === 'provider-error' && error.message.includes('Endpoint is unavailable'));
 });
 test('model fallback does not swallow non-retryable errors', async () => {
-  await assert.rejects(attemptWithCandidateModels(async () => { throw new ModelHitchError('model-not-found', 'No such model.', { providerId: 'opencode-zen' }); }, ['first', 'second']), (error) => error.code === 'model-not-found');
+  await assert.rejects(attemptWithCandidateModels(async () => { throw new ModelHitchError('model-not-found', 'No such model.', { providerId: 'openrouter' }); }, ['first', 'second']), (error) => error.code === 'model-not-found');
 });
 test('retryable detection maps rate limits and upstream 5xx responses', () => {
   assert.equal(isRetryableModelError(new ModelHitchError('rate-limited', 'x')), true);

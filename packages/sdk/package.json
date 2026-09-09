@@ -1,6 +1,6 @@
 {
   "name": "@dirgest/sdk",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Context-aware project suggestion engine",
   "type": "module",
   "keywords": [
@@ -31,7 +31,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "modelhitch": "0.14.0"
+    "modelhitch": "^2.0.0"
   },
   "files": [
     "lib"

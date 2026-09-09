@@ -117,18 +117,22 @@
 /**
  * @typedef {Object} Environment
  * @property {string} [OPENAI_API_KEY]
+ * @property {string} [AI_GATEWAY_API_KEY]
+ * @property {string} [VERCEL_OIDC_TOKEN]
+ * @property {string} [VERCEL_TOKEN]
+ * @property {string} [ANTHROPIC_API_KEY]
  * @property {string} [DIRGEST_PROVIDER]
  * @property {string} [DIRGEST_MODEL]
  * @property {string} [DIRGEST_BRIDGE_URL]
  * @property {string} [DIRGEST_BRIDGE_MODEL]
  * @property {string} [GROQ_API_KEY]
- * @property {string} [OPENCODE_ZEN_API_KEY]
+ * @property {string} [OPENROUTER_API_KEY]
  * @property {string} [key: string] - Any environment variable may be present
  */
 
 /**
  * @typedef {Object} ModelConfiguration
- * @property {string} provider - The resolved provider ID (e.g., 'openai', 'groq', 'opencode-zen')
+ * @property {string} provider - The resolved provider ID (e.g., 'openai', 'groq', 'vercel-ai-gateway')
  * @property {string} model - The resolved model ID
  * @property {boolean} usesModelHitchConfiguration - Whether the config came from ModelHitch auto-detection
  * @property {Object} [credentials] - Optional credentials (apiKey, baseUrl) for bridge/direct providers

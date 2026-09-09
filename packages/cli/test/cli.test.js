@@ -25,13 +25,13 @@ test('update check prompts and restarts only when npm has a newer version', asyn
     input,
     output,
     env: {},
-    fetchImpl: async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '0.2.7' } }) }),
-    prompt: async (_input, _output, version) => { prompted = true; return version === '0.2.7'; },
+    fetchImpl: async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '0.2.8' } }) }),
+    prompt: async (_input, _output, version) => { prompted = true; return version === '0.2.8'; },
     update: (version) => { updatedVersion = version; return { restarted: true, status: 0 }; },
   });
 
   assert.equal(prompted, true);
-  assert.equal(updatedVersion, '0.2.7');
+  assert.equal(updatedVersion, '0.2.8');
   assert.deepEqual(result, { restarted: true, status: 0 });
 });
 
