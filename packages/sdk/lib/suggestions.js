@@ -83,18 +83,25 @@ const RATE_LIMITED_DEFAULT_MODELS = new Map([
   ['meta-llama/llama-3.1-8b-instruct:free', 'openai/gpt-4o-mini'],
 ]);
 const BRIDGE_MODEL_PREFERENCES = [
+  'deepseek/deepseek-v4-flash',
   'deepseek-v4-flash',
   'openai/gpt-4o-mini',
   'openai/gpt-5.4-mini',
   'gpt-5.6-luna',
   'gpt-5.4-mini',
   'gpt-5.4-nano',
+  'anthropic/claude-haiku-4.5',
   'anthropic/claude-haiku-4-5',
   'claude-haiku-4-5',
+  'google/gemini-2.5-flash-lite',
+  'gemini/models/gemini-3.5-flash-lite',
   'gemini-3.5-flash-lite',
   'big-pickle',
   'mock/mock-model',
 ];
+const BRIDGE_HEALTH_TIMEOUT_MS = 1500;
+/** V2 bridges advertise large model catalogs; 1.5s is too tight for /v1/models. */
+const BRIDGE_MODELS_TIMEOUT_MS = 15_000;
 
 function createHitch() {
   return new ModelHitch({ autoMode: true });
@@ -149,9 +156,9 @@ export async function attemptWithCandidateModels(task, candidates) {
 async function findBridgeConfiguration(environment = process.env) {
   const bridgeUrl = (environment.DIRGEST_BRIDGE_URL || DEFAULT_BRIDGE_URL).replace(/\/+$/, '');
   try {
-    const health = await fetch(`${bridgeUrl}/healthz`, { signal: AbortSignal.timeout(500) });
+    const health = await fetch(`${bridgeUrl}/healthz`, { signal: AbortSignal.timeout(BRIDGE_HEALTH_TIMEOUT_MS) });
     if (!health.ok) return null;
-    const models = await fetch(`${bridgeUrl}/v1/models`, { signal: AbortSignal.timeout(1500) });
+    const models = await fetch(`${bridgeUrl}/v1/models`, { signal: AbortSignal.timeout(BRIDGE_MODELS_TIMEOUT_MS) });
     if (!models.ok) return null;
     const catalog = await models.json();
     const configuration = resolveBridgeConfiguration(catalog, environment);

@@ -30,6 +30,10 @@ test('bridge model preference picks a reliable model before the rate-limited fre
   const catalog = { data: [{ id: 'big-pickle' }, { id: 'deepseek-v4-flash' }, { id: 'gpt-5.6-luna' }] };
   assert.deepEqual(resolveBridgeConfiguration(catalog, {}), { provider: 'openai', model: 'deepseek-v4-flash', credentials: { apiKey: 'sk-bridge-local', baseUrl: 'http://127.0.0.1:3939/v1' }, usesModelHitchConfiguration: true });
   assert.equal(resolveBridgeConfiguration({ data: [{ id: 'only-random-model' }] }, {}).model, 'only-random-model');
+  assert.equal(
+    resolveBridgeConfiguration({ data: [{ id: 'alibaba/qwen-3-14b' }, { id: 'deepseek/deepseek-v4-flash' }, { id: 'openai/gpt-4o-mini' }] }, {}).model,
+    'deepseek/deepseek-v4-flash'
+  );
 });
 test('resolveModelConfiguration avoids rate-limited free-tier defaults', () => {
   const hitch = {
