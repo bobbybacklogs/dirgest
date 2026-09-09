@@ -17,10 +17,10 @@ test('update checks compare stable semantic versions', () => {
 });
 
 test('Windows npm install spawn uses shell so .cmd shims work', () => {
-  const windows = buildNpmInstallSpawn('0.2.9', { platform: 'win32' });
-  assert.deepEqual(windows, { command: 'npm', args: ['install', '--global', '@dirgest/cli@0.2.9'], options: { stdio: 'inherit', shell: true } });
-  const unix = buildNpmInstallSpawn('0.2.9', { platform: 'linux' });
-  assert.deepEqual(unix, { command: 'npm', args: ['install', '--global', '@dirgest/cli@0.2.9'], options: { stdio: 'inherit' } });
+  const windows = buildNpmInstallSpawn('0.2.10', { platform: 'win32' });
+  assert.deepEqual(windows, { command: 'npm', args: ['install', '--global', '@dirgest/cli@0.2.10'], options: { stdio: 'inherit', shell: true } });
+  const unix = buildNpmInstallSpawn('0.2.10', { platform: 'linux' });
+  assert.deepEqual(unix, { command: 'npm', args: ['install', '--global', '@dirgest/cli@0.2.10'], options: { stdio: 'inherit' } });
 });
 
 test('update check prompts and restarts only when npm has a newer version', async () => {
