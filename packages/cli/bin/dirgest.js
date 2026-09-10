@@ -175,7 +175,12 @@ async function main() {
       } else {
         choice = await promptForSelection(process.stdin, process.stdout, { interactive: false, count: suggestions.length });
       }
-      if (choice === 'all') process.stdout.write(`\n${renderPrompts(suggestions)}\n`);
+      if (choice === 'all') {
+        process.stdout.write(`\n${renderPrompts(suggestions)}\n`);
+        for (const suggestion of suggestions) {
+          await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestion.title });
+        }
+      }
       if (typeof choice === 'number') {
         process.stdout.write(`\n${renderPrompts([suggestions[choice]], choice)}\n`);
         await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestions[choice].title });

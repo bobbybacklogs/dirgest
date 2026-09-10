@@ -1,6 +1,6 @@
 {
   "name": "@dirgest/cli",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "Context-aware project feature suggestions CLI",
   "type": "module",
   "keywords": [
