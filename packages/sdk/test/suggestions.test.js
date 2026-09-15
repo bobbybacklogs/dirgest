@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attemptWithCandidateModels, bridgeModelCandidates, buildModelHitchClientOptions, getAskResponse, getSuggestions, isRetryableModelError, lanesFromPolicy, resolveBridgeConfiguration, resolveModelConfiguration, validateAskResponse, validateSuggestions } from '@dirgest/sdk/lib/suggestions.js';
+import { attemptWithCandidateModels, bridgeModelCandidates, buildModelHitchClientOptions, createModelSession, getAskResponse, getSuggestions, isRetryableModelError, lanesFromPolicy, resolveBridgeConfiguration, resolveModelConfiguration, validateAskResponse, validateSuggestions } from '@dirgest/sdk/lib/suggestions.js';
 import { ModelHitchError } from 'modelhitch';
-import { parseSelection } from '@dirgest/sdk/lib/selection-internal.js';
+import { parseSelection, selectedSuggestionEntries } from '@dirgest/sdk/lib/selection-internal.js';
 
 const prompt = 'Implement this feature while preserving the existing architecture, adding meaningful validation, handling errors, and testing the finished user-facing workflow.';
 test('validateSuggestions accepts strict 3-4 word titles and complete prompts', () => { const suggestions = validateSuggestions({ suggestions: ['Project Health Summary', 'Guided First Run', 'Actionable Error Messages', 'Focused Test Coverage'].map((title) => ({ title, prompt: `${prompt} ${title}` })) }); assert.equal(suggestions.length, 4); });
@@ -60,6 +60,47 @@ test('buildModelHitchClientOptions uses config policy instead of default autoMod
   assert.equal(withoutPolicy.policy, undefined);
 });
 test('bridge model configuration gives the global override precedence', () => { const catalog = { data: [{ id: 'other-model' }, { id: 'big-pickle' }] }; assert.equal(resolveBridgeConfiguration(catalog, { DIRGEST_MODEL: 'explicit-model', DIRGEST_BRIDGE_MODEL: 'bridge-model' }).model, 'explicit-model'); assert.equal(resolveBridgeConfiguration(catalog, { DIRGEST_BRIDGE_MODEL: 'bridge-model' }).model, 'bridge-model'); assert.deepEqual(resolveBridgeConfiguration(catalog, {}), { provider: 'openai', model: 'big-pickle', credentials: { apiKey: 'sk-bridge-local', baseUrl: 'http://127.0.0.1:3939/v1' }, usesModelHitchConfiguration: true }); assert.equal(resolveBridgeConfiguration({ data: [] }, {}), null); });
+test('bridge model prefers ModelHitch config routing over dirgest defaults', () => {
+  const catalog = { data: [{ id: 'vercel-ai-gateway/openai/gpt-5.4' }, { id: 'deepseek/deepseek-v4-flash' }, { id: 'openai/gpt-4o-mini' }] };
+  const hitchConfig = { version: 1, defaultProviderId: 'deepseek', defaultModel: 'deepseek-v4-flash', policy: { trusted: [{ providerId: 'deepseek', models: ['deepseek-v4-flash'] }], fallback: [] } };
+  assert.equal(resolveBridgeConfiguration(catalog, { AI_GATEWAY_API_KEY: 'gateway-key' }, hitchConfig).model, 'deepseek/deepseek-v4-flash');
+});
+test('createModelSession uses a healthy ModelHitch bridge even when a direct provider key is set', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const href = String(url);
+    if (href.endsWith('/healthz')) return { ok: true };
+    if (href.includes('/v1/models')) return { ok: true, json: async () => ({ data: [{ id: 'deepseek/deepseek-v4-flash' }, { id: 'vercel-ai-gateway/openai/gpt-5.4' }] }) };
+    throw new Error(`unexpected fetch ${href}`);
+  };
+  try {
+    const hitchConfig = { version: 1, defaultProviderId: 'deepseek', defaultModel: 'deepseek-v4-flash', policy: { trusted: [{ providerId: 'deepseek', models: ['deepseek-v4-flash'] }], fallback: [] } };
+    const session = await createModelSession({ AI_GATEWAY_API_KEY: 'gateway-key', DIRGEST_BRIDGE_URL: 'http://127.0.0.1:3939' }, hitchConfig);
+    assert.equal(session.configuration.provider, 'openai');
+    assert.equal(session.configuration.model, 'deepseek/deepseek-v4-flash');
+    assert.equal(session.configuration.credentials.baseUrl, 'http://127.0.0.1:3939/v1');
+    assert.deepEqual(session.candidates, ['deepseek/deepseek-v4-flash']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+test('createModelSession skips the bridge when DIRGEST_PROVIDER is set', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetched = false;
+  globalThis.fetch = async () => {
+    fetched = true;
+    throw new Error('bridge should not be probed');
+  };
+  try {
+    const session = await createModelSession({ DIRGEST_PROVIDER: 'openai', DIRGEST_MODEL: 'gpt-4o-mini', OPENAI_API_KEY: 'openai-key' }, null);
+    assert.equal(fetched, false);
+    assert.equal(session.configuration.provider, 'openai');
+    assert.equal(session.configuration.model, 'gpt-4o-mini');
+    assert.equal(session.configuration.credentials, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 test('bridge model preference picks a reliable model before the rate-limited free-tier default', () => {
   const catalog = { data: [{ id: 'big-pickle' }, { id: 'deepseek-v4-flash' }, { id: 'gpt-5.6-luna' }] };
   assert.deepEqual(resolveBridgeConfiguration(catalog, {}), { provider: 'openai', model: 'deepseek-v4-flash', credentials: { apiKey: 'sk-bridge-local', baseUrl: 'http://127.0.0.1:3939/v1' }, usesModelHitchConfiguration: true });
@@ -111,7 +152,23 @@ test('retryable detection maps rate limits and upstream 5xx responses', () => {
   assert.equal(isRetryableModelError(new ModelHitchError('model-not-found', 'x')), false);
   assert.equal(isRetryableModelError(new Error('plain')), false);
 });
-test('parseSelection handles prompt, all, and quit choices', () => { assert.equal(parseSelection('2', 5), 1); assert.equal(parseSelection('a', 5), 'all'); assert.equal(parseSelection('q', 5), 'quit'); assert.equal(parseSelection('9', 5), null); });
+test('parseSelection handles prompt, all, and quit choices', () => {
+  assert.deepEqual(parseSelection('2', 5), [1]);
+  assert.equal(parseSelection('a', 5), 'all');
+  assert.equal(parseSelection('q', 5), 'quit');
+  assert.equal(parseSelection('9', 5), null);
+});
+test('parseSelection accepts unique comma- or space-separated numbers', () => {
+  assert.deepEqual(parseSelection('1, 5', 6), [0, 4]);
+  assert.deepEqual(parseSelection('1,5,1', 6), [0, 4]);
+  assert.deepEqual(parseSelection('6 2', 6), [5, 1]);
+  assert.equal(parseSelection('1, 7', 6), null);
+});
+test('selectedSuggestionEntries maps all and multi-select onto original indexes', () => {
+  const suggestions = ['one', 'two', 'three', 'four', 'five', 'six'].map((title) => ({ title, prompt }));
+  assert.deepEqual(selectedSuggestionEntries('all', suggestions).map(({ index }) => index), [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual(selectedSuggestionEntries([0, 4], suggestions).map(({ suggestion }) => suggestion.title), ['one', 'five']);
+});
 
 test('validateAskResponse accepts a valid fit response', () => {
   const result = validateAskResponse({ fit: true, reasoning: 'This feature aligns well with the project.', prompt: 'Implement a dark mode toggle for the application. Start by reviewing the existing theme system and CSS variables.' });

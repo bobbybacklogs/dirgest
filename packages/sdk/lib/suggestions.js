@@ -205,12 +205,24 @@ function safeDefaultModel(providerDefault) {
   return RATE_LIMITED_DEFAULT_MODELS.get(providerDefault) || providerDefault;
 }
 
-export function resolveBridgeConfiguration(catalog, environment = process.env) {
+function pickAdvertisedModel(advertisedModelIds, ...candidates) {
+  return candidates.find((candidateId) => candidateId && advertisedModelIds.has(candidateId));
+}
+
+function routedBridgeModel(hitchConfig, environment = process.env, advertisedModelIds = new Set()) {
+  const explicit = environment.DIRGEST_MODEL || environment.DIRGEST_BRIDGE_MODEL;
+  if (explicit) return explicit;
+  const routing = firstRoutingLane(hitchConfig, environment, defaultProviders);
+  if (!routing) return null;
+  const qualified = `${routing.providerId}/${routing.model}`;
+  return pickAdvertisedModel(advertisedModelIds, qualified, routing.model) || qualified;
+}
+
+export function resolveBridgeConfiguration(catalog, environment = process.env, hitchConfig = null) {
   const models = Array.isArray(catalog?.data) ? catalog.data : [];
   const advertisedModelIds = new Set(models.map((candidate) => candidate?.id).filter(Boolean));
-  const preferredModel = BRIDGE_MODEL_PREFERENCES.find((candidateId) => advertisedModelIds.has(candidateId));
-  const defaultModel = preferredModel || models[0]?.id;
-  const model = environment.DIRGEST_MODEL || environment.DIRGEST_BRIDGE_MODEL || defaultModel;
+  const preferredModel = pickAdvertisedModel(advertisedModelIds, ...BRIDGE_MODEL_PREFERENCES);
+  const model = routedBridgeModel(hitchConfig, environment, advertisedModelIds) || preferredModel || models[0]?.id;
   if (!model) return null;
   return { provider: 'openai', model, credentials: { apiKey: 'sk-bridge-local', baseUrl: `${(environment.DIRGEST_BRIDGE_URL || DEFAULT_BRIDGE_URL).replace(/\/+$/, '')}/v1` }, usesModelHitchConfiguration: true };
 }
@@ -221,10 +233,6 @@ export function bridgeModelCandidates(catalog) {
   const preferred = BRIDGE_MODEL_PREFERENCES.filter((candidateId) => advertisedModelIds.has(candidateId));
   if (preferred.length > 0) return preferred;
   return models[0]?.id ? [models[0].id] : [];
-}
-
-function dedupeModels(models) {
-  return [...new Set(models.filter(Boolean))];
 }
 
 export function isRetryableModelError(error) {
@@ -246,7 +254,7 @@ export async function attemptWithCandidateModels(task, candidates) {
   throw lastError || new Error('No model candidates were available.');
 }
 
-async function findBridgeConfiguration(environment = process.env) {
+async function findBridgeConfiguration(environment = process.env, hitchConfig = null) {
   const bridgeUrl = (environment.DIRGEST_BRIDGE_URL || DEFAULT_BRIDGE_URL).replace(/\/+$/, '');
   try {
     const health = await fetch(`${bridgeUrl}/healthz`, { signal: AbortSignal.timeout(BRIDGE_HEALTH_TIMEOUT_MS) });
@@ -254,9 +262,9 @@ async function findBridgeConfiguration(environment = process.env) {
     const models = await fetch(`${bridgeUrl}/v1/models`, { signal: AbortSignal.timeout(BRIDGE_MODELS_TIMEOUT_MS) });
     if (!models.ok) return null;
     const catalog = await models.json();
-    const configuration = resolveBridgeConfiguration(catalog, environment);
+    const configuration = resolveBridgeConfiguration(catalog, environment, hitchConfig);
     if (!configuration) return null;
-    return { configuration, candidates: bridgeModelCandidates(catalog) };
+    return { configuration, candidates: [configuration.model] };
   } catch {
     return null;
   }
@@ -271,28 +279,27 @@ export function resolveModelConfiguration(hitch, environment = process.env, hitc
   return { provider, model, usesModelHitchConfiguration: Boolean((configuredProvider || hitchConfigHasRouting(hitchConfig)) && !environment.DIRGEST_PROVIDER) };
 }
 
-async function resolveProviderCandidates(hitch, environment = process.env, hitchConfig = null) {
-  let configuration = resolveModelConfiguration(hitch, environment, hitchConfig);
-  let bridgeCandidates = [];
-  if (!configuration.usesModelHitchConfiguration && !environment.DIRGEST_PROVIDER) {
-    const bridge = await findBridgeConfiguration(environment);
-    if (bridge) {
-      configuration = bridge.configuration;
-      bridgeCandidates = bridge.candidates;
-    }
-  }
-  const { provider, usesModelHitchConfiguration, credentials } = configuration;
+async function resolveDirectProviderCandidates(hitch, environment = process.env, hitchConfig = null) {
+  const configuration = resolveModelConfiguration(hitch, environment, hitchConfig);
+  const { provider, usesModelHitchConfiguration } = configuration;
   if (provider === 'openai' && !environment.OPENAI_API_KEY && !usesModelHitchConfiguration) throw new Error('No ModelHitch provider configuration was found. Set a supported provider API key (for example OPENAI_API_KEY or AI_GATEWAY_API_KEY), set DIRGEST_PROVIDER, or use --mock for offline mode.');
-  const candidates = credentials?.baseUrl
-    ? dedupeModels([configuration.model, ...bridgeCandidates])
-    : [configuration.model];
-  return { configuration, candidates };
+  return { configuration, candidates: [configuration.model] };
+}
+
+function createBridgeHitch() {
+  // Failover belongs to the running ModelHitch bridge; the client must not apply default autoMode lanes.
+  return new ModelHitch();
 }
 
 // Shared entry point so every SDK capability resolves providers and fallback models identically.
-export async function createModelSession(environment = process.env, hitchConfig = loadModelHitchUserConfig(environment)) {
-  const hitch = await createHitch(environment, hitchConfig);
-  const { configuration, candidates } = await resolveProviderCandidates(hitch, environment, hitchConfig);
+export async function createModelSession(environment = process.env, hitchConfig = undefined) {
+  const resolvedConfig = hitchConfig === undefined ? loadModelHitchUserConfig(environment) : hitchConfig;
+  if (!environment.DIRGEST_PROVIDER) {
+    const bridge = await findBridgeConfiguration(environment, resolvedConfig);
+    if (bridge) return { hitch: createBridgeHitch(), configuration: bridge.configuration, candidates: bridge.candidates };
+  }
+  const hitch = await createHitch(environment, resolvedConfig);
+  const { configuration, candidates } = await resolveDirectProviderCandidates(hitch, environment, resolvedConfig);
   return { hitch, configuration, candidates };
 }
 

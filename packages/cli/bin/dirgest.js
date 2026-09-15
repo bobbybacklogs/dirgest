@@ -3,7 +3,7 @@
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
-import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory } from '@dirgest/sdk';
+import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory, selectedSuggestionEntries } from '@dirgest/sdk';
 import { promptForSelection } from '../lib/selection.js';
 import { browseSuggestions, renderAskResponse, renderError, renderFeatureReview, renderHeader, renderHistory, renderInspection, renderPrompts, renderSuggestions } from '../lib/ui.js';
 import { maybeUpdate } from '../lib/update.js';
@@ -175,15 +175,16 @@ async function main() {
       } else {
         choice = await promptForSelection(process.stdin, process.stdout, { interactive: false, count: suggestions.length });
       }
-      if (choice === 'all') {
-        process.stdout.write(`\n${renderPrompts(suggestions)}\n`);
-        for (const suggestion of suggestions) {
-          await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestion.title });
+      if (choice === 'quit') {
+        // No prompts and no history for an explicit quit.
+      } else {
+        const selected = selectedSuggestionEntries(choice, suggestions);
+        if (selected.length > 0) {
+          process.stdout.write(`\n${renderPrompts(selected.map(({ suggestion }) => suggestion), selected.map(({ index }) => index))}\n`);
+          for (const { suggestion } of selected) {
+            await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestion.title });
+          }
         }
-      }
-      if (typeof choice === 'number') {
-        process.stdout.write(`\n${renderPrompts([suggestions[choice]], choice)}\n`);
-        await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestions[choice].title });
       }
     }
   } catch (error) {

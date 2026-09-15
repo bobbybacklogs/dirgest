@@ -1,3 +1,5 @@
+import { selectionInstructions } from './selection.js';
+
 const ANSI = { reset: '\u001b[0m', bold: '\u001b[1m', dim: '\u001b[2m', cyan: '\u001b[36m', green: '\u001b[32m', red: '\u001b[31m' };
 const color = (code, text) => `${code}${text}${ANSI.reset}`;
 
@@ -39,8 +41,16 @@ export function renderInspection(project) {
 
   return lines.join('\n');
 }
-export function renderSuggestions(suggestions) { return `\n${suggestions.map((suggestion, index) => `  ${color(ANSI.green, String(index + 1).padStart(2, ' '))}  ${color(ANSI.bold, suggestion.title)}`).join('\n')}\n\n${color(ANSI.dim, 'Choose 1-6 for a full coding prompt, a for all prompts, q to exit.')}`; }
-export function renderPrompts(suggestions, startIndex = 0) { return suggestions.map((suggestion, index) => `${color(ANSI.bold + ANSI.cyan, `${startIndex + index + 1}. ${suggestion.title}`)}\n${suggestion.prompt}`).join('\n\n'); }
+export function renderSuggestions(suggestions) {
+  const count = suggestions.length;
+  return `\n${suggestions.map((suggestion, index) => `  ${color(ANSI.green, String(index + 1).padStart(2, ' '))}  ${color(ANSI.bold, suggestion.title)}`).join('\n')}\n\n${color(ANSI.dim, selectionInstructions(count))}`;
+}
+export function renderPrompts(suggestions, startIndex = 0) {
+  return suggestions.map((suggestion, index) => {
+    const displayNumber = Array.isArray(startIndex) ? startIndex[index] + 1 : startIndex + index + 1;
+    return `${color(ANSI.bold + ANSI.cyan, `${displayNumber}. ${suggestion.title}`)}\n${suggestion.prompt}`;
+  }).join('\n\n');
+}
 export function renderError(message) { return color(ANSI.red, `dirgest: ${message}`); }
 
 export function renderAskResponse(response, question) {
@@ -87,7 +97,10 @@ export async function browseSuggestions(suggestions, project) {
   const { Box, Text, TextAttributes, createCliRenderer } = await import('@opentui/core');
   const renderer = await createCliRenderer({ exitOnCtrlC: false, consoleMode: 'disabled', screenMode: 'alternate-screen' });
   let selectedIndex = 0;
+  const toggled = new Set();
   let settled = false;
+  const count = suggestions.length;
+  const digitPattern = new RegExp(`^[1-${Math.min(9, count)}]$`);
 
   return new Promise((resolve) => {
     const finish = (choice) => {
@@ -96,13 +109,17 @@ export async function browseSuggestions(suggestions, project) {
       renderer.destroy();
       resolve(choice);
     };
+    const commitToggles = () => {
+      if (toggled.size > 0) return finish([...toggled].sort((left, right) => left - right));
+      return finish([selectedIndex]);
+    };
     const render = () => {
       for (const child of renderer.root.getChildren()) renderer.root.remove(child);
       const previewLimit = Math.max(500, renderer.width * Math.max(8, renderer.height - 9));
       const rows = suggestions.map((suggestion, index) => Text({
-        content: `${index === selectedIndex ? '>' : ' '} ${index + 1}. ${suggestion.title}`,
-        fg: index === selectedIndex ? '#67E8F9' : '#D1D5DB',
-        attributes: index === selectedIndex ? TextAttributes.BOLD : 0,
+        content: `${index === selectedIndex ? '>' : ' '}${toggled.has(index) ? '*' : ' '} ${index + 1}. ${suggestion.title}`,
+        fg: index === selectedIndex ? '#67E8F9' : toggled.has(index) ? '#67E8F9' : '#D1D5DB',
+        attributes: index === selectedIndex || toggled.has(index) ? TextAttributes.BOLD : 0,
       }));
       renderer.root.add(Box(
         { width: '100%', height: '100%', flexDirection: 'column', padding: 1, gap: 1, backgroundColor: '#0F172A' },
@@ -110,13 +127,13 @@ export async function browseSuggestions(suggestions, project) {
         Text({ content: project.crawl ? 'Broad project crawl context' : 'Bounded project sample', fg: '#94A3B8' }),
         Box(
           { flexDirection: 'row', flexGrow: 1, gap: 1 },
-          Box({ width: '38%', borderStyle: 'rounded', borderColor: '#334155', padding: 1, title: 'Suggestions', titleColor: '#94A3B8', gap: 1 }, ...rows),
+          Box({ width: '38%', borderStyle: 'rounded', borderColor: '#334155', padding: 1, title: `Suggestions (${count})`, titleColor: '#94A3B8', gap: 1 }, ...rows),
           Box(
             { flexGrow: 1, borderStyle: 'rounded', borderColor: '#155E75', padding: 1, title: suggestions[selectedIndex].title, titleColor: '#67E8F9' },
             Text({ content: truncatePreview(suggestions[selectedIndex].prompt, previewLimit), fg: '#E2E8F0' }),
           ),
         ),
-        Text({ content: 'Up/Down or j/k: browse  Enter: select  a: all prompts  q: quit', fg: '#94A3B8' }),
+        Text({ content: `Up/Down or j/k: browse  Space or 1-${count}: toggle  Enter: select  a: all prompts  q: quit`, fg: '#94A3B8' }),
       ));
     };
 
@@ -124,7 +141,13 @@ export async function browseSuggestions(suggestions, project) {
       if (key.ctrl && key.name === 'c') return finish('quit');
       if (key.name === 'q' || key.name === 'escape') return finish('quit');
       if (key.name === 'a') return finish('all');
-      if (key.name === 'return') return finish(selectedIndex);
+      if (key.name === 'return') return commitToggles();
+      if (key.name === 'space') {
+        if (toggled.has(selectedIndex)) toggled.delete(selectedIndex);
+        else toggled.add(selectedIndex);
+        render();
+        return;
+      }
       if (key.name === 'up' || key.name === 'k') {
         selectedIndex = (selectedIndex - 1 + suggestions.length) % suggestions.length;
         render();
@@ -133,9 +156,14 @@ export async function browseSuggestions(suggestions, project) {
         selectedIndex = (selectedIndex + 1) % suggestions.length;
         render();
       }
-      if (/^[1-6]$/.test(key.name)) {
+      if (digitPattern.test(key.name)) {
         const index = Number(key.name) - 1;
-        if (index < suggestions.length) finish(index);
+        if (index < suggestions.length) {
+          if (toggled.has(index)) toggled.delete(index);
+          else toggled.add(index);
+          selectedIndex = index;
+          render();
+        }
       }
     });
     renderer.on('resize', render);

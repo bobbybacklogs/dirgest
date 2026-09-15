@@ -120,13 +120,13 @@ dirgest --suggest
 
 <br>
 
-Dirgest depends on `modelhitch@^2.0.0` and loads `~/.modelhitch/config.json` (or `$MODELHITCH_HOME/config.json`) before calling `chat()`.
+Dirgest depends on `modelhitch@^2.0.0` and talks to a running ModelHitch bridge when one is healthy.
 
-1. **Honor ModelHitch rotations.** If that config has a `policy` (`trusted` then `fallback` lanes), dirgest constructs ModelHitch with that policy and starts on the first trusted lane. Config `keys` are loaded into the ModelHitch keystore. Without a policy, dirgest uses `autoMode: true` (ModelHitch's default gateway failover lineup).
-2. **Configured provider next.** If there is no policy, dirgest scans ModelHitch's providers for a configured API-key env var (including fallbacks, and V2's private OpenAI-compatible `config` fields) and uses the first one it finds — typically `AI_GATEWAY_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / etc. Config `defaultProviderId` / `defaultModel` win over that scan.
-3. **Avoids rate-limited free-tier defaults.** Auto-detected OpenRouter free defaults and legacy `big-pickle` models are rewritten to sturdier defaults. Other providers keep their native default (`openai` → `gpt-4o-mini`, `vercel-ai-gateway` → `openai/gpt-5.4`, `groq` → `llama-3.3-70b-versatile`).
-4. **Local bridge fallback.** With no direct credential and no ModelHitch policy/keys, dirgest probes `http://127.0.0.1:3939` and, if healthy, picks the first advertised model from a preference list (including V2 `provider/model` ids).
-5. **Retry on failure.** Dirgest still rotates bridge candidates on retryable errors. Direct providers fail over through the loaded ModelHitch policy, or through `autoMode` lanes when no policy is configured. `DIRGEST_PROVIDER` / `DIRGEST_MODEL` pin the primary lane; policy/autoMode still cover the rest.
+1. **Live ModelHitch bridge first.** If `http://127.0.0.1:3939` (or `DIRGEST_BRIDGE_URL`) is up, dirgest sends the request there and lets the bridge apply `~/.modelhitch/config.json` policy rotations. A direct provider key such as `AI_GATEWAY_API_KEY` does **not** skip the bridge. `DIRGEST_PROVIDER` still forces a direct provider.
+2. **Honor ModelHitch rotations without a bridge.** If the bridge is down, dirgest loads `~/.modelhitch/config.json` (or `$MODELHITCH_HOME/config.json`). A `policy` (`trusted` then `fallback`) is passed into the ModelHitch client. Config `keys` go into the keystore. Without a policy, dirgest uses `autoMode: true` (ModelHitch's default gateway failover lineup).
+3. **Configured provider next.** If there is no policy, dirgest scans ModelHitch's providers for a configured API-key env var (including fallbacks, and V2's private OpenAI-compatible `config` fields) and uses the first one it finds — typically `AI_GATEWAY_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GROQ_API_KEY` / etc. Config `defaultProviderId` / `defaultModel` win over that scan.
+4. **Avoids rate-limited free-tier defaults.** Auto-detected OpenRouter free defaults and legacy `big-pickle` models are rewritten to sturdier defaults. Other providers keep their native default (`openai` → `gpt-4o-mini`, `vercel-ai-gateway` → `openai/gpt-5.4`, `groq` → `llama-3.3-70b-versatile`).
+5. **Retry on failure.** Direct providers fail over through the loaded ModelHitch policy, or through `autoMode` lanes when no policy is configured. The bridge owns rotation for bridge requests. `DIRGEST_PROVIDER` / `DIRGEST_MODEL` pin the primary lane.
 
 Dirgest never prints env values or API keys.
 
