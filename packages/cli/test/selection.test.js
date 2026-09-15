@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
 import { Writable } from 'node:stream';
 import test from 'node:test';
-import { promptForSelection } from '../lib/selection.js';
+import { promptForSelection, promptToSaveAskChoice } from '../lib/selection.js';
 import { renderPrompts, renderSuggestions } from '../lib/ui.js';
+
+test('promptToSaveAskChoice skips save outside an interactive terminal', async () => {
+  let output = '';
+  const stream = new Writable({ write(chunk, encoding, callback) { output += chunk; callback(); } });
+  assert.equal(await promptToSaveAskChoice(process.stdin, stream, { interactive: false, fit: true }), false);
+  assert.match(output, /save this choice to history/);
+  output = '';
+  assert.equal(await promptToSaveAskChoice(process.stdin, stream, { interactive: false, fit: false }), false);
+  assert.match(output, /save this choice to history/);
+});
 
 test('promptForSelection exits cleanly for non-interactive input', async () => {
   let output = '';

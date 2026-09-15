@@ -33,12 +33,45 @@ export async function clearHistory(projectDirectory) {
   await fs.rm(path.join(projectDirectory, HISTORY_DIR), { recursive: true, force: true });
 }
 
+const TITLE_MAX = 80;
+
+export function titleFromPrompt(text, fallback = 'Recommended alternative') {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return fallback;
+  const sentence = raw.split(/(?<=[.!?])\s+/)[0] || raw;
+  const withoutLead = sentence.replace(/^(implement|add|create|build|try this instead:?)\s+/i, '').replace(/[.!?]+$/, '').trim();
+  const candidate = withoutLead || sentence || fallback;
+  if (candidate.length <= TITLE_MAX) return candidate;
+  return `${candidate.slice(0, TITLE_MAX - 3).trimEnd()}...`;
+}
+
+export function askHistoryEntry(question, response) {
+  const trimmedQuestion = String(question || '').trim();
+  if (response?.fit) {
+    return { mode: 'ask', title: trimmedQuestion, verdict: 'fit', question: trimmedQuestion };
+  }
+  return {
+    mode: 'ask',
+    title: titleFromPrompt(response?.alternative, trimmedQuestion || 'Recommended alternative'),
+    verdict: 'misfit',
+    question: trimmedQuestion,
+    rejected: trimmedQuestion,
+  };
+}
+
+function formatHistoryLine(entry) {
+  const date = new Date(entry.timestamp).toISOString().slice(0, 10);
+  if (entry.verdict === 'misfit' && entry.rejected) {
+    return `- [${date}] (ask) Chose "${entry.title}" instead of "${entry.rejected}"`;
+  }
+  if (entry.verdict === 'fit' && entry.mode === 'ask') {
+    return `- [${date}] (ask) Accepted "${entry.title}"`;
+  }
+  return `- [${date}] (${entry.mode || 'balanced'}) ${entry.title}`;
+}
+
 export function formatHistoryForPrompt(history) {
   if (!history.length) return '';
   const recent = history.slice(-10);
-  const lines = recent.map((entry) => {
-    const date = new Date(entry.timestamp).toISOString().slice(0, 10);
-    return `- [${date}] (${entry.mode || 'balanced'}) ${entry.title}`;
-  });
-  return `\n\nPreviously selected suggestions (avoid repeating these areas):\n${lines.join('\n')}`;
+  return `\n\nPreviously selected suggestions (avoid repeating these areas):\n${recent.map(formatHistoryLine).join('\n')}`;
 }

@@ -116,6 +116,25 @@ test('--review ingests a markdown feature list and reports fits and misfits', as
   assert.match(result.stdout, /Good fits \(1\)/);
 });
 
+test('--ask prints a verdict and does not write history without confirmation', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'dirgest-cli-ask-'));
+  await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: 'ask-test' }));
+  await writeFile(path.join(directory, 'index.js'), 'export const ready = true;');
+  const result = spawnSync(process.execPath, ['bin/dirgest.js', '--ask', 'add dark mode toggle', '--mock', '--dir', directory], {
+    cwd: packageDirectory,
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Good fit/);
+  assert.match(result.stdout, /save this choice to history/);
+  const history = spawnSync(process.execPath, ['bin/dirgest.js', '--history', '--dir', directory], {
+    cwd: packageDirectory,
+    encoding: 'utf8',
+  });
+  assert.match(history.stdout, /No suggestion history yet/);
+});
+
 test('--review rejects unsupported feature file types', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'dirgest-cli-review-bad-'));
   const featureFile = path.join(directory, 'features.json');

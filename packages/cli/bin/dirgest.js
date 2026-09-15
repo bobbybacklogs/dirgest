@@ -3,8 +3,8 @@
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
-import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory, selectedSuggestionEntries } from '@dirgest/sdk';
-import { promptForSelection } from '../lib/selection.js';
+import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory, selectedSuggestionEntries, askHistoryEntry } from '@dirgest/sdk';
+import { promptForSelection, promptToSaveAskChoice } from '../lib/selection.js';
 import { browseSuggestions, renderAskResponse, renderError, renderFeatureReview, renderHeader, renderHistory, renderInspection, renderPrompts, renderSuggestions } from '../lib/ui.js';
 import { maybeUpdate } from '../lib/update.js';
 
@@ -34,7 +34,7 @@ Options:
   --inspect          Scan a directory and report its tech stack and project signals
     -s, --suggest [mode]   Generate balanced suggestions, or target growth, ux, technical, or wild ideas
       --suggestions      Generate balanced feature suggestions (legacy alias)
-  -a, --ask <question>    Evaluate a feature idea against the codebase
+  -a, --ask <question>    Evaluate a feature idea against the codebase; save the choice to history when asked
   -r, --review <file>     Review a .md or .txt feature list against the codebase (implies --crawl)
        --history          Show previously selected suggestions
        --clear-history    Clear suggestion history
@@ -158,6 +158,11 @@ async function main() {
     } else if (options.ask) {
       const response = await getAskResponse(project, options.askQuestion, { mock: options.mock });
       process.stdout.write(`${renderAskResponse(response, options.askQuestion)}\n`);
+      const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+      if (await promptToSaveAskChoice(process.stdin, process.stdout, { interactive, fit: response.fit })) {
+        await writeHistory(project.directory, askHistoryEntry(options.askQuestion, response));
+        process.stdout.write('Saved to history. Later suggestions and ask checks will remember this choice.\n');
+      }
     } else {
       const suggestions = await getSuggestions(project, { mock: options.mock, mode: options.suggestionMode });
       process.stdout.write(`${renderSuggestions(suggestions)}\n`);

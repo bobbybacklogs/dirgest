@@ -241,10 +241,14 @@ test('GET /projects/:id/history returns history array', async () => {
 test('POST /projects/:id/history records a selection', async () => {
   const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'a.js', content: '{}' }], name: 'a' });
   const { data: { id } } = await insp.json();
-  const res = await req('POST', `/api/v1/projects/${id}/history`, { mode: 'balanced', title: 'Test Feature' });
+  const res = await req('POST', `/api/v1/projects/${id}/history`, { mode: 'ask', title: 'dark mode toggle', verdict: 'fit', question: 'add dark mode toggle' });
   assert.equal(res.status, 200);
   const { data } = await res.json();
   assert.equal(data.recorded, true);
+  const listed = await req('GET', `/api/v1/projects/${id}/history`);
+  const { data: listedData } = await listed.json();
+  assert.equal(listedData.history[0].verdict, 'fit');
+  assert.equal(listedData.history[0].question, 'add dark mode toggle');
 });
 
 test('DELETE /projects/:id/history clears history', async () => {

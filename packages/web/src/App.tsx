@@ -111,10 +111,10 @@ export function App() {
   );
 
   const handleRecordSelection = useCallback(
-    async (mode: string, title: string) => {
+    async (mode: string, title: string, extras?: { verdict?: string; question?: string; rejected?: string }) => {
       if (!project) return;
       try {
-        await api.recordHistory(project.id, mode, title);
+        await api.recordHistory(project.id, mode, title, extras);
         const result = await api.getHistory(project.id);
         setHistory(result.history);
         showToast('Recorded');
@@ -123,6 +123,17 @@ export function App() {
       }
     },
     [project, showToast],
+  );
+
+  const handleSaveAsk = useCallback(
+    async (title: string, question: string, fit: boolean) => {
+      await handleRecordSelection('ask', title, {
+        verdict: fit ? 'fit' : 'misfit',
+        question,
+        ...(fit ? {} : { rejected: question }),
+      });
+    },
+    [handleRecordSelection],
   );
 
   const handleLoadHistory = useCallback(async () => {
@@ -217,6 +228,7 @@ export function App() {
             <AskPanel
               response={askResponse}
               onAsk={handleAsk}
+              onSave={handleSaveAsk}
             />
           )}
           {tab === 'review' && (

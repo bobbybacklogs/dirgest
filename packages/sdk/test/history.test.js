@@ -3,7 +3,7 @@ import test from 'node:test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath } from '@dirgest/sdk/lib/history.js';
+import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath, titleFromPrompt, askHistoryEntry } from '@dirgest/sdk/lib/history.js';
 
 let tempDir;
 
@@ -96,4 +96,34 @@ test('formatHistoryForPrompt only includes last 10 entries', () => {
 test('historyPath returns correct path', () => {
   const result = historyPath('/some/dir');
   assert.ok(result.includes('.dirgest') && result.includes('history.json'));
+});
+
+test('titleFromPrompt strips leading verbs and truncates long sentences', () => {
+  assert.equal(titleFromPrompt('Implement a health dashboard for the app.'), 'a health dashboard for the app');
+  assert.equal(titleFromPrompt(''), 'Recommended alternative');
+  const long = `Implement ${'x'.repeat(120)}.`;
+  const title = titleFromPrompt(long);
+  assert.ok(title.length <= 80);
+  assert.ok(title.endsWith('...'));
+});
+
+test('askHistoryEntry records accepted ideas and recommended alternatives', () => {
+  const fit = askHistoryEntry('add dark mode toggle', { fit: true, prompt: 'Implement dark mode for the app with tests and existing theme tokens in place here.' });
+  assert.deepEqual(fit, { mode: 'ask', title: 'add dark mode toggle', verdict: 'fit', question: 'add dark mode toggle' });
+  const misfit = askHistoryEntry('hardware dongle', { fit: false, alternative: 'Implement a project health summary dashboard that surfaces recent changes and metrics from the existing codebase.' });
+  assert.equal(misfit.mode, 'ask');
+  assert.equal(misfit.verdict, 'misfit');
+  assert.equal(misfit.rejected, 'hardware dongle');
+  assert.ok(misfit.title.startsWith('a project health summary dashboard'));
+  assert.ok(misfit.title.length <= 80);
+});
+
+test('formatHistoryForPrompt describes ask fits and misfits', () => {
+  const history = [
+    { timestamp: new Date('2025-01-15T10:00:00Z').getTime(), mode: 'ask', verdict: 'fit', title: 'dark mode toggle', question: 'dark mode toggle' },
+    { timestamp: new Date('2025-01-16T10:00:00Z').getTime(), mode: 'ask', verdict: 'misfit', title: 'health dashboard', rejected: 'hardware dongle' },
+  ];
+  const result = formatHistoryForPrompt(history);
+  assert.ok(result.includes('Accepted "dark mode toggle"'));
+  assert.ok(result.includes('Chose "health dashboard" instead of "hardware dongle"'));
 });

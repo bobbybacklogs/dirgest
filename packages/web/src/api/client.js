@@ -39,10 +39,10 @@ export async function reviewFeatures(id, content, filename, mock = false) {
 export async function getHistory(id) {
     return request(`/api/v1/projects/${id}/history`);
 }
-export async function recordHistory(id, mode, title) {
+export async function recordHistory(id, mode, title, extras) {
     await request(`/api/v1/projects/${id}/history`, {
         method: 'POST',
-        body: JSON.stringify({ mode, title }),
+        body: JSON.stringify({ mode, title, ...extras }),
     });
 }
 export async function clearHistory(id) {

@@ -12,7 +12,7 @@ npx @dirgest/cli --suggest
 ```sh
 dirgest --suggest                      # 4-6 balanced ideas
 dirgest --suggest growth               # or: ux · technical · wild
-dirgest --ask "add a dark mode toggle" # does this idea fit?
+dirgest --ask "add a dark mode toggle" # does this idea fit? save it if you want to remember
 dirgest --review roadmap.md            # score a whole feature list
 dirgest --inspect                      # report stack, configs, scripts, and tests
 dirgest --suggest --crawl              # widen the context first

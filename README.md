@@ -34,7 +34,7 @@ That's it. Dirgest samples your project, works out what it actually is, and retu
 ```sh
 dirgest --suggest                      # 4-6 balanced ideas
 dirgest --suggest growth               # or: ux · technical · wild
-dirgest --ask "add a dark mode toggle" # does this idea fit?
+dirgest --ask "add a dark mode toggle" # does this idea fit? save to remember
 dirgest --review roadmap.md            # score a whole feature list
 dirgest --suggest --crawl              # widen the context first
 dirgest --history                      # what you've picked before
@@ -43,7 +43,7 @@ dirgest --history                      # what you've picked before
 | Flag | Does |
 |---|---|
 | `-s, --suggest [mode]` | `growth` · `ux` · `technical` · `wild`, or omit for balanced |
-| `-a, --ask <question>` | Fit / no-fit verdict, with reasoning and a prompt or an alternative |
+| `-a, --ask <question>` | Fit / no-fit verdict, with reasoning and a prompt or an alternative. In a real terminal, you can save the idea (or the recommended alternative) to history |
 | `-r, --review <file>` | Review a `.md` / `.txt` feature list against the codebase |
 | `-d, --dir <path>` | Target a different project (defaults to cwd) |
 | `--crawl` | Map up to 2,000 files and sample 96 across directories |
@@ -52,7 +52,7 @@ dirgest --history                      # what you've picked before
 
 In a real terminal, suggestions open in an interactive browser — `↑`/`↓` or `j`/`k` to preview, `Enter` or `1`–`6` to pick, `a` for all, `q` to quit. Needs Node 26.4+; older versions fall back to a plain picker automatically.
 
-Selections are remembered in `.dirgest/history.json` and fed back into later prompts, so dirgest stops repeating ground you've already covered.
+Selections are remembered in `.dirgest/history.json` and fed back into later prompts, so dirgest stops repeating ground you've already covered. `--ask` offers the same save step after a good fit, or after you take the recommended alternative on a miss.
 
 <br>
 

@@ -80,6 +80,9 @@ export interface HistoryEntry {
   timestamp: number;
   mode: string;
   title: string;
+  verdict?: 'fit' | 'misfit';
+  question?: string;
+  rejected?: string;
 }
 
 export interface ApiResponse<T> {

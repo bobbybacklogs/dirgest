@@ -88,11 +88,11 @@ export function App() {
             setLoading(null);
         }
     }, [project, showToast]);
-    const handleRecordSelection = useCallback(async (mode, title) => {
+    const handleRecordSelection = useCallback(async (mode, title, extras) => {
         if (!project)
             return;
         try {
-            await api.recordHistory(project.id, mode, title);
+            await api.recordHistory(project.id, mode, title, extras);
             const result = await api.getHistory(project.id);
             setHistory(result.history);
             showToast('Recorded');
@@ -101,6 +101,13 @@ export function App() {
             showToast('Failed to record');
         }
     }, [project, showToast]);
+    const handleSaveAsk = useCallback(async (title, question, fit) => {
+        await handleRecordSelection('ask', title, {
+            verdict: fit ? 'fit' : 'misfit',
+            question,
+            ...(fit ? {} : { rejected: question }),
+        });
+    }, [handleRecordSelection]);
     const handleLoadHistory = useCallback(async () => {
         if (!project)
             return;
@@ -144,5 +151,5 @@ export function App() {
                                             ? 'Ask'
                                             : t === 'review'
                                                 ? 'Review list'
-                                                : 'History' }, t))), _jsx("button", { className: "tab", onClick: handleReset, style: { marginLeft: 'auto' }, children: "New project" })] }), tab === 'understand' && (_jsx(ProjectView, { context: project.context, onGenerateSuggestions: handleGenerateSuggestions })), tab === 'suggest' && (_jsx(SuggestionPanel, { suggestions: suggestions, activeMode: activeMode, onGenerate: handleGenerateSuggestions, onRecord: handleRecordSelection })), tab === 'ask' && (_jsx(AskPanel, { response: askResponse, onAsk: handleAsk })), tab === 'review' && (_jsx(ReviewPanel, { review: review, onReview: handleReviewFeatures })), tab === 'history' && (_jsx(HistoryPanel, { history: history, onClear: handleClearHistory }))] })), toast && _jsx("div", { className: "toast", children: toast })] }));
+                                                : 'History' }, t))), _jsx("button", { className: "tab", onClick: handleReset, style: { marginLeft: 'auto' }, children: "New project" })] }), tab === 'understand' && (_jsx(ProjectView, { context: project.context, onGenerateSuggestions: handleGenerateSuggestions })), tab === 'suggest' && (_jsx(SuggestionPanel, { suggestions: suggestions, activeMode: activeMode, onGenerate: handleGenerateSuggestions, onRecord: handleRecordSelection })), tab === 'ask' && (_jsx(AskPanel, { response: askResponse, onAsk: handleAsk, onSave: handleSaveAsk })), tab === 'review' && (_jsx(ReviewPanel, { review: review, onReview: handleReviewFeatures })), tab === 'history' && (_jsx(HistoryPanel, { history: history, onClear: handleClearHistory }))] })), toast && _jsx("div", { className: "toast", children: toast })] }));
 }

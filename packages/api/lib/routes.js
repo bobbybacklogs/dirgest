@@ -136,9 +136,13 @@ export function createRoutes(cache, jobs) {
     const id = c.req.param('id');
     const context = cache.get(id);
     if (!context) return fail('not-found', `Project ${id} not found. Inspect it first.`, 404);
-    const { mode, title } = await c.req.json();
+    const { mode, title, verdict, question, rejected } = await c.req.json();
     if (!title || typeof title !== 'string') return fail('bad-request', 'A "title" string is required.');
-    await writeHistory(context.directory, { mode: mode || 'balanced', title });
+    const entry = { mode: mode || 'balanced', title };
+    if (verdict === 'fit' || verdict === 'misfit') entry.verdict = verdict;
+    if (typeof question === 'string' && question.trim()) entry.question = question.trim();
+    if (typeof rejected === 'string' && rejected.trim()) entry.rejected = rejected.trim();
+    await writeHistory(context.directory, entry);
     return ok({ id, recorded: true });
   });
 

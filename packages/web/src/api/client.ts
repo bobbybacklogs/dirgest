@@ -78,10 +78,11 @@ export async function recordHistory(
   id: string,
   mode: string,
   title: string,
+  extras?: { verdict?: string; question?: string; rejected?: string },
 ): Promise<void> {
   await request<{ recorded: boolean }>(`/api/v1/projects/${id}/history`, {
     method: 'POST',
-    body: JSON.stringify({ mode, title }),
+    body: JSON.stringify({ mode, title, ...extras }),
   });
 }
 

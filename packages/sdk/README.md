@@ -38,6 +38,7 @@ Pass `{ mock: true }` to any of these for deterministic offline output — no ne
 | `reviewFeatures(project, features, opts)` | Split a feature list into fits and misfits |
 | `readFeatureFile(path)` | Read and parse a `.md` / `.txt` feature list |
 | `readHistory` · `writeHistory` · `clearHistory` | Selection feedback loop |
+| `askHistoryEntry(question, response)` | History payload for a saved `--ask` verdict |
 
 Types are documented as JSDoc in [`lib/types.js`](lib/types.js).
 

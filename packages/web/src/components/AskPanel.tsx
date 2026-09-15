@@ -4,15 +4,30 @@ import type { AskResponse } from '../types';
 interface Props {
   response: AskResponse | null;
   onAsk: (question: string) => void;
+  onSave?: (title: string, question: string, fit: boolean) => void;
 }
 
-export function AskPanel({ response, onAsk }: Props) {
+function titleFromAsk(question: string, response: AskResponse): string {
+  if (response.fit) return question.trim();
+  const sentence = response.alternative.replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s+/)[0] || response.alternative;
+  const cleaned = sentence.replace(/^(implement|add|create|build|try this instead:?)\s+/i, '').replace(/[.!?]+$/, '').trim();
+  const title = cleaned || question.trim();
+  return title.length > 80 ? `${title.slice(0, 77).trimEnd()}...` : title;
+}
+
+export function AskPanel({ response, onAsk, onSave }: Props) {
   const [input, setInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const [lastQuestion, setLastQuestion] = useState('');
+  const [saved, setSaved] = useState(false);
 
   const handleSubmit = useCallback(() => {
     const q = input.trim();
-    if (q) onAsk(q);
+    if (q) {
+      setLastQuestion(q);
+      setSaved(false);
+      onAsk(q);
+    }
   }, [input, onAsk]);
 
   const handleCopy = useCallback(async (text: string) => {
@@ -60,6 +75,20 @@ export function AskPanel({ response, onAsk }: Props) {
                 </button>
                 {response.prompt}
               </div>
+              {onSave && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <button
+                    className="btn btn-sm"
+                    disabled={saved}
+                    onClick={() => {
+                      onSave(titleFromAsk(lastQuestion, response), lastQuestion, true);
+                      setSaved(true);
+                    }}
+                  >
+                    {saved ? 'Saved' : 'Remember this idea'}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div>
@@ -73,6 +102,20 @@ export function AskPanel({ response, onAsk }: Props) {
                 </button>
                 {response.alternative}
               </div>
+              {onSave && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <button
+                    className="btn btn-sm"
+                    disabled={saved}
+                    onClick={() => {
+                      onSave(titleFromAsk(lastQuestion, response), lastQuestion, false);
+                      setSaved(true);
+                    }}
+                  >
+                    {saved ? 'Saved' : 'Remember this alternative'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
