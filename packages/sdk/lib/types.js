@@ -125,6 +125,7 @@
  * @property {string} [DIRGEST_MODEL]
  * @property {string} [DIRGEST_BRIDGE_URL]
  * @property {string} [DIRGEST_BRIDGE_MODEL]
+ * @property {string} [MODELHITCH_HOME]
  * @property {string} [GROQ_API_KEY]
  * @property {string} [OPENROUTER_API_KEY]
  * @property {string} [key: string] - Any environment variable may be present

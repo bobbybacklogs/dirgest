@@ -1,4 +1,6 @@
-import { ModelHitch } from 'modelhitch';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { buildCooldownFromConfig, defaultProviders, isMaskedSecret, MemoryKeyStore, ModelHitch, readConfigFile } from 'modelhitch';
 import { readHistory, formatHistoryForPrompt } from './history.js';
 
 const FEATURE_SCHEMA = { type: 'object', additionalProperties: false, required: ['suggestions'], properties: { suggestions: { type: 'array', minItems: 4, maxItems: 6, items: { type: 'object', additionalProperties: false, required: ['title', 'prompt'], properties: { title: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 &/-]{2,59}$' }, prompt: { type: 'string', minLength: 80 } } } } } };
@@ -76,6 +78,97 @@ function hasConfiguredCredential(provider, environment) {
   return providerCredentialEnvNames(provider).some((name) => Boolean(environment[name]?.trim()));
 }
 
+function usablePolicy(hitchConfig) {
+  const policy = hitchConfig?.policy;
+  if (!policy) return null;
+  const trusted = Array.isArray(policy.trusted) ? policy.trusted : [];
+  const fallback = Array.isArray(policy.fallback) ? policy.fallback : [];
+  if (trusted.length + fallback.length === 0) return null;
+  return { ...policy, trusted, fallback };
+}
+
+function hasUnmaskedConfigKey(hitchConfig, providerId) {
+  const value = hitchConfig?.keys?.[providerId];
+  return Boolean(typeof value === 'string' && value.trim() && !isMaskedSecret(value));
+}
+
+function hitchConfigHasRouting(hitchConfig) {
+  return Boolean(usablePolicy(hitchConfig) || hitchConfig?.defaultProviderId || Object.keys(hitchConfig?.keys || {}).some((providerId) => hasUnmaskedConfigKey(hitchConfig, providerId)));
+}
+
+export function modelhitchConfigPath(environment = process.env) {
+  const home = environment.MODELHITCH_HOME || join(homedir(), '.modelhitch');
+  return join(home, 'config.json');
+}
+
+export function loadModelHitchUserConfig(environment = process.env) {
+  try {
+    return readConfigFile(modelhitchConfigPath(environment));
+  } catch {
+    return null;
+  }
+}
+
+export function lanesFromPolicy(policy, providers = []) {
+  const usable = usablePolicy({ policy });
+  if (!usable) return [];
+  const providersById = new Map(providers.map((provider) => [provider.id, provider]));
+  const lanes = [];
+  const pushEntry = (entry) => {
+    if (!entry?.providerId) return;
+    const models = entry.models?.length
+      ? entry.models
+      : [safeDefaultModel(providersById.get(entry.providerId)?.defaultModel)];
+    for (const model of models) lanes.push({ providerId: entry.providerId, model });
+  };
+  for (const entry of usable.trusted) pushEntry(entry);
+  for (const entry of usable.fallback) pushEntry(entry);
+  return lanes;
+}
+
+export function firstRoutingLane(hitchConfig, environment = process.env, providers = defaultProviders) {
+  if (environment.DIRGEST_PROVIDER) {
+    const selected = providers.find((provider) => provider.id === environment.DIRGEST_PROVIDER);
+    return { providerId: environment.DIRGEST_PROVIDER, model: environment.DIRGEST_MODEL || hitchConfig?.defaultModel || safeDefaultModel(selected?.defaultModel) };
+  }
+  const policy = usablePolicy(hitchConfig);
+  if (policy) {
+    const [primary] = lanesFromPolicy(policy, providers);
+    if (primary) return environment.DIRGEST_MODEL ? { ...primary, model: environment.DIRGEST_MODEL } : primary;
+  }
+  if (hitchConfig?.defaultProviderId) {
+    const selected = providers.find((provider) => provider.id === hitchConfig.defaultProviderId);
+    return { providerId: hitchConfig.defaultProviderId, model: environment.DIRGEST_MODEL || hitchConfig.defaultModel || safeDefaultModel(selected?.defaultModel) };
+  }
+  return null;
+}
+
+export async function buildModelHitchClientOptions(hitchConfig, environment = process.env) {
+  const keystore = new MemoryKeyStore();
+  for (const [providerId, apiKey] of Object.entries(hitchConfig?.keys || {})) {
+    if (typeof apiKey === 'string' && apiKey.trim() && !isMaskedSecret(apiKey)) await keystore.set(providerId, apiKey);
+  }
+  const policy = usablePolicy(hitchConfig);
+  const primary = firstRoutingLane(hitchConfig, environment, defaultProviders);
+  const options = { keystore };
+  if (primary) {
+    options.defaultProviderId = primary.providerId;
+    options.defaultModel = primary.model;
+  }
+  if (policy) {
+    options.policy = policy;
+    try {
+      const cooldown = hitchConfig ? buildCooldownFromConfig(hitchConfig) : undefined;
+      if (cooldown) options.cooldown = cooldown;
+    } catch {
+      // Registry autoMode still works if a config cooldown section is incomplete.
+    }
+    return options;
+  }
+  options.autoMode = true;
+  return options;
+}
+
 const DEFAULT_BRIDGE_URL = 'http://127.0.0.1:3939';
 /** Free / demo defaults that are commonly rate-limited; prefer a sturdier model when auto-detecting. */
 const RATE_LIMITED_DEFAULT_MODELS = new Map([
@@ -103,8 +196,8 @@ const BRIDGE_HEALTH_TIMEOUT_MS = 1500;
 /** V2 bridges advertise large model catalogs; 1.5s is too tight for /v1/models. */
 const BRIDGE_MODELS_TIMEOUT_MS = 15_000;
 
-function createHitch() {
-  return new ModelHitch({ autoMode: true });
+async function createHitch(environment = process.env, hitchConfig = null) {
+  return new ModelHitch(await buildModelHitchClientOptions(hitchConfig, environment));
 }
 
 function safeDefaultModel(providerDefault) {
@@ -169,16 +262,17 @@ async function findBridgeConfiguration(environment = process.env) {
   }
 }
 
-export function resolveModelConfiguration(hitch, environment = process.env) {
-  const configuredProvider = hitch.providers.find((provider) => hasConfiguredCredential(provider, environment));
-  const provider = environment.DIRGEST_PROVIDER || configuredProvider?.id || 'openai';
+export function resolveModelConfiguration(hitch, environment = process.env, hitchConfig = null) {
+  const routing = firstRoutingLane(hitchConfig, environment, hitch.providers);
+  const configuredProvider = hitch.providers.find((provider) => hasConfiguredCredential(provider, environment) || hasUnmaskedConfigKey(hitchConfig, provider.id));
+  const provider = routing?.providerId || configuredProvider?.id || 'openai';
   const selectedProvider = hitch.providers.find((candidate) => candidate.id === provider);
-  const model = environment.DIRGEST_MODEL || safeDefaultModel(selectedProvider?.defaultModel);
-  return { provider, model, usesModelHitchConfiguration: Boolean(configuredProvider && !environment.DIRGEST_PROVIDER) };
+  const model = routing?.model || environment.DIRGEST_MODEL || safeDefaultModel(selectedProvider?.defaultModel);
+  return { provider, model, usesModelHitchConfiguration: Boolean((configuredProvider || hitchConfigHasRouting(hitchConfig)) && !environment.DIRGEST_PROVIDER) };
 }
 
-async function resolveProviderCandidates(hitch, environment = process.env) {
-  let configuration = resolveModelConfiguration(hitch, environment);
+async function resolveProviderCandidates(hitch, environment = process.env, hitchConfig = null) {
+  let configuration = resolveModelConfiguration(hitch, environment, hitchConfig);
   let bridgeCandidates = [];
   if (!configuration.usesModelHitchConfiguration && !environment.DIRGEST_PROVIDER) {
     const bridge = await findBridgeConfiguration(environment);
@@ -196,9 +290,9 @@ async function resolveProviderCandidates(hitch, environment = process.env) {
 }
 
 // Shared entry point so every SDK capability resolves providers and fallback models identically.
-export async function createModelSession(environment = process.env) {
-  const hitch = createHitch();
-  const { configuration, candidates } = await resolveProviderCandidates(hitch, environment);
+export async function createModelSession(environment = process.env, hitchConfig = loadModelHitchUserConfig(environment)) {
+  const hitch = await createHitch(environment, hitchConfig);
+  const { configuration, candidates } = await resolveProviderCandidates(hitch, environment, hitchConfig);
   return { hitch, configuration, candidates };
 }
 
@@ -218,8 +312,7 @@ export async function getSuggestions(project, { mock = false, mode = 'balanced',
   if (mock) return mockSuggestions(project, mode);
   const history = await readHistory(project.directory);
   const historyContext = formatHistoryForPrompt(history);
-  const hitch = createHitch();
-  const { configuration, candidates } = await resolveProviderCandidates(hitch, environment);
+  const { hitch, configuration, candidates } = await createModelSession(environment);
   const { provider, credentials } = configuration;
   try {
     const messages = buildSuggestionMessages(project, mode, historyContext);
@@ -283,8 +376,7 @@ export async function getAskResponse(project, question, { mock = false, environm
   if (mock) return mockAskResponse(project, question);
   const history = await readHistory(project.directory);
   const historyContext = formatHistoryForPrompt(history);
-  const hitch = createHitch();
-  const { configuration, candidates } = await resolveProviderCandidates(hitch, environment);
+  const { hitch, configuration, candidates } = await createModelSession(environment);
   const { provider, credentials } = configuration;
   try {
     const messages = buildAskMessages(project, question, historyContext);

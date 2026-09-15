@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attemptWithCandidateModels, bridgeModelCandidates, getAskResponse, getSuggestions, isRetryableModelError, resolveBridgeConfiguration, resolveModelConfiguration, validateAskResponse, validateSuggestions } from '@dirgest/sdk/lib/suggestions.js';
+import { attemptWithCandidateModels, bridgeModelCandidates, buildModelHitchClientOptions, getAskResponse, getSuggestions, isRetryableModelError, lanesFromPolicy, resolveBridgeConfiguration, resolveModelConfiguration, validateAskResponse, validateSuggestions } from '@dirgest/sdk/lib/suggestions.js';
 import { ModelHitchError } from 'modelhitch';
 import { parseSelection } from '@dirgest/sdk/lib/selection-internal.js';
 
@@ -25,6 +25,40 @@ test('ModelHitch V2 OpenAI-compatible providers expose credentials via config', 
   assert.deepEqual(resolveModelConfiguration(hitch, { OPENAI_API_KEY: 'openai-key' }), { provider: 'openai', model: 'gpt-4o-mini', usesModelHitchConfiguration: true });
 });
 test('dirgest model overrides win and no ModelHitch configuration preserves OpenAI defaults', () => { const hitch = { providers: [{ id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' }, { id: 'groq', defaultModel: 'llama-3.3-70b-versatile', apiKeyEnvVar: 'GROQ_API_KEY' }] }; assert.deepEqual(resolveModelConfiguration(hitch, {}), { provider: 'openai', model: 'gpt-4o-mini', usesModelHitchConfiguration: false }); assert.deepEqual(resolveModelConfiguration(hitch, { GROQ_API_KEY: 'configured-key', DIRGEST_PROVIDER: 'openai', DIRGEST_MODEL: 'gpt-4.1-mini' }), { provider: 'openai', model: 'gpt-4.1-mini', usesModelHitchConfiguration: false }); });
+test('ModelHitch policy rotations win over the first env-key provider', () => {
+  const hitch = {
+    providers: [
+      { id: 'vercel-ai-gateway', defaultModel: 'openai/gpt-5.4', config: { apiKeyEnvVar: 'AI_GATEWAY_API_KEY' } },
+      { id: 'anthropic', defaultModel: 'claude-sonnet-4.6', apiKeyEnvVar: 'ANTHROPIC_API_KEY' },
+      { id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' }
+    ]
+  };
+  const hitchConfig = {
+    version: 1,
+    policy: {
+      trusted: [{ providerId: 'anthropic', models: ['claude-sonnet-4.6'] }, { providerId: 'vercel-ai-gateway', models: ['google/gemini-3-flash'] }],
+      fallback: [{ providerId: 'openai', models: ['gpt-4o-mini'] }]
+    }
+  };
+  assert.deepEqual(resolveModelConfiguration(hitch, { AI_GATEWAY_API_KEY: 'gateway-key' }, hitchConfig), { provider: 'anthropic', model: 'claude-sonnet-4.6', usesModelHitchConfiguration: true });
+  assert.deepEqual(lanesFromPolicy(hitchConfig.policy, hitch.providers).map((lane) => `${lane.providerId}/${lane.model}`), ['anthropic/claude-sonnet-4.6', 'vercel-ai-gateway/google/gemini-3-flash', 'openai/gpt-4o-mini']);
+});
+test('DIRGEST_PROVIDER still pins the primary lane ahead of ModelHitch policy', () => {
+  const hitch = { providers: [{ id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' }, { id: 'anthropic', defaultModel: 'claude-sonnet-4.6', apiKeyEnvVar: 'ANTHROPIC_API_KEY' }] };
+  const hitchConfig = { version: 1, policy: { trusted: [{ providerId: 'anthropic', models: ['claude-sonnet-4.6'] }], fallback: [] } };
+  assert.deepEqual(resolveModelConfiguration(hitch, { DIRGEST_PROVIDER: 'openai', DIRGEST_MODEL: 'gpt-4.1-mini' }, hitchConfig), { provider: 'openai', model: 'gpt-4.1-mini', usesModelHitchConfiguration: false });
+});
+test('buildModelHitchClientOptions uses config policy instead of default autoMode lanes', async () => {
+  const hitchConfig = { version: 1, policy: { trusted: [{ providerId: 'anthropic', models: ['claude-sonnet-4.6'] }], fallback: [{ providerId: 'openai', models: ['gpt-4o-mini'] }] }, keys: { anthropic: 'sk-user-config' } };
+  const withPolicy = await buildModelHitchClientOptions(hitchConfig, {});
+  assert.equal(withPolicy.autoMode, undefined);
+  assert.deepEqual(withPolicy.policy, hitchConfig.policy);
+  assert.equal(withPolicy.defaultProviderId, 'anthropic');
+  assert.equal(withPolicy.defaultModel, 'claude-sonnet-4.6');
+  const withoutPolicy = await buildModelHitchClientOptions(null, {});
+  assert.equal(withoutPolicy.autoMode, true);
+  assert.equal(withoutPolicy.policy, undefined);
+});
 test('bridge model configuration gives the global override precedence', () => { const catalog = { data: [{ id: 'other-model' }, { id: 'big-pickle' }] }; assert.equal(resolveBridgeConfiguration(catalog, { DIRGEST_MODEL: 'explicit-model', DIRGEST_BRIDGE_MODEL: 'bridge-model' }).model, 'explicit-model'); assert.equal(resolveBridgeConfiguration(catalog, { DIRGEST_BRIDGE_MODEL: 'bridge-model' }).model, 'bridge-model'); assert.deepEqual(resolveBridgeConfiguration(catalog, {}), { provider: 'openai', model: 'big-pickle', credentials: { apiKey: 'sk-bridge-local', baseUrl: 'http://127.0.0.1:3939/v1' }, usesModelHitchConfiguration: true }); assert.equal(resolveBridgeConfiguration({ data: [] }, {}), null); });
 test('bridge model preference picks a reliable model before the rate-limited free-tier default', () => {
   const catalog = { data: [{ id: 'big-pickle' }, { id: 'deepseek-v4-flash' }, { id: 'gpt-5.6-luna' }] };
