@@ -2,7 +2,18 @@
 
 Truthful inventory of what the monorepo implements today. Statuses are from source inspection plus the default verify command. They are **not** copied from `ROADMAP.md` or marketing copy.
 
-Last bootstrap: 2026-09-21. Default verify: `npm run verify` (`npm test --workspaces`). Live LLM was **not** run (no provider key and no ModelHitch bridge in this environment).
+Last bootstrap: 2026-09-21. Default verify: `npm run verify` (`npm test --workspaces`).
+
+Proof (this environment, no secrets):
+
+| Workspace | Result |
+|---|---|
+| `@dirgest/api` | 32 pass / 0 fail |
+| `@dirgest/cli` | 15 pass / 0 fail |
+| `@dirgest/sdk` | 92 pass / 0 fail |
+| `@dirgest/web` | `tsc --noEmit` exit 0 |
+
+Live LLM was **not** run (no provider key and no ModelHitch bridge in this environment).
 
 ## Status vocabulary
 
