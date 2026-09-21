@@ -80,7 +80,7 @@ export interface HistoryEntry {
   timestamp: number;
   mode: string;
   title: string;
-  verdict?: 'fit' | 'misfit';
+  verdict?: 'fit' | 'misfit' | 'excluded';
   question?: string;
   rejected?: string;
 }

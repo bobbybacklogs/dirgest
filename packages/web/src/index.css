@@ -459,8 +459,12 @@ body {
   min-width: 72px;
 }
 
-.history-title {
-  color: var(--text-0);
+.history-item.excluded .history-mode {
+  color: var(--warning);
+}
+
+.history-item.excluded .history-title {
+  color: var(--text-2);
 }
 
 /* Tabs */

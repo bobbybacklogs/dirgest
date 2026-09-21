@@ -21,7 +21,7 @@ Serves on [localhost:3940](http://localhost:3940) — the browser UI at `/` and 
 | `POST /projects/:id/suggestions` | `{ mode?, mock? }` → 4–6 ideas |
 | `POST /projects/:id/ask` | `{ question, mock? }` → fit verdict |
 | `POST /projects/:id/review` | `{ content, filename }` or `{ features[] }` → fits and misfits |
-| `GET · POST · DELETE /projects/:id/history` | Selection history |
+| `GET · POST · DELETE /projects/:id/history` | Selection and exclusion history |
 | `POST /projects/:id/inspect/async` · `GET /jobs/:id` | Async scan for large repos |
 
 Every response is enveloped as `{ ok, data | error, meta }`.

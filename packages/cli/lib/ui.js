@@ -83,6 +83,9 @@ export function renderHistory(history) {
   if (!history.length) return `\n${color(ANSI.dim, 'No suggestion history yet.')}`;
   const lines = history.map((entry) => {
     const date = new Date(entry.timestamp).toISOString().slice(0, 10);
+    if (entry.verdict === 'excluded') {
+      return `  ${color(ANSI.dim, date)}  ${color(ANSI.red, 'excluded'.padEnd(10))} ${color(ANSI.bold, entry.title)}`;
+    }
     return `  ${color(ANSI.dim, date)}  ${color(ANSI.green, (entry.mode || 'balanced').padEnd(10))} ${color(ANSI.bold, entry.title)}`;
   });
   return `\n${color(ANSI.bold, 'Suggestion history:')}\n${lines.join('\n')}`;
@@ -93,14 +96,13 @@ function truncatePreview(prompt, maximumCharacters) {
   return `${prompt.slice(0, Math.max(0, maximumCharacters - 3)).trimEnd()}...`;
 }
 
-export async function browseSuggestions(suggestions, project) {
+export async function browseSuggestions(suggestions, project, { onExclude } = {}) {
   const { Box, Text, TextAttributes, createCliRenderer } = await import('@opentui/core');
   const renderer = await createCliRenderer({ exitOnCtrlC: false, consoleMode: 'disabled', screenMode: 'alternate-screen' });
+  let remaining = [...suggestions];
   let selectedIndex = 0;
   const toggled = new Set();
   let settled = false;
-  const count = suggestions.length;
-  const digitPattern = new RegExp(`^[1-${Math.min(9, count)}]$`);
 
   return new Promise((resolve) => {
     const finish = (choice) => {
@@ -113,10 +115,12 @@ export async function browseSuggestions(suggestions, project) {
       if (toggled.size > 0) return finish([...toggled].sort((left, right) => left - right));
       return finish([selectedIndex]);
     };
+    const digitPattern = () => new RegExp(`^[1-${Math.min(9, remaining.length)}]$`);
     const render = () => {
       for (const child of renderer.root.getChildren()) renderer.root.remove(child);
       const previewLimit = Math.max(500, renderer.width * Math.max(8, renderer.height - 9));
-      const rows = suggestions.map((suggestion, index) => Text({
+      const count = remaining.length;
+      const rows = remaining.map((suggestion, index) => Text({
         content: `${index === selectedIndex ? '>' : ' '}${toggled.has(index) ? '*' : ' '} ${index + 1}. ${suggestion.title}`,
         fg: index === selectedIndex ? '#67E8F9' : toggled.has(index) ? '#67E8F9' : '#D1D5DB',
         attributes: index === selectedIndex || toggled.has(index) ? TextAttributes.BOLD : 0,
@@ -129,42 +133,55 @@ export async function browseSuggestions(suggestions, project) {
           { flexDirection: 'row', flexGrow: 1, gap: 1 },
           Box({ width: '38%', borderStyle: 'rounded', borderColor: '#334155', padding: 1, title: `Suggestions (${count})`, titleColor: '#94A3B8', gap: 1 }, ...rows),
           Box(
-            { flexGrow: 1, borderStyle: 'rounded', borderColor: '#155E75', padding: 1, title: suggestions[selectedIndex].title, titleColor: '#67E8F9' },
-            Text({ content: truncatePreview(suggestions[selectedIndex].prompt, previewLimit), fg: '#E2E8F0' }),
+            { flexGrow: 1, borderStyle: 'rounded', borderColor: '#155E75', padding: 1, title: remaining[selectedIndex].title, titleColor: '#67E8F9' },
+            Text({ content: truncatePreview(remaining[selectedIndex].prompt, previewLimit), fg: '#E2E8F0' }),
           ),
         ),
-        Text({ content: `Up/Down or j/k: browse  Space or 1-${count}: toggle  Enter: select  a: all prompts  q: quit`, fg: '#94A3B8' }),
+        Text({ content: `Up/Down or j/k: browse  Space or 1-${count}: toggle  x: exclude  Enter: select  a: all prompts  q: quit`, fg: '#94A3B8' }),
       ));
     };
 
     renderer.keyInput.on('keypress', (key) => {
-      if (key.ctrl && key.name === 'c') return finish('quit');
-      if (key.name === 'q' || key.name === 'escape') return finish('quit');
-      if (key.name === 'a') return finish('all');
-      if (key.name === 'return') return commitToggles();
-      if (key.name === 'space') {
-        if (toggled.has(selectedIndex)) toggled.delete(selectedIndex);
-        else toggled.add(selectedIndex);
-        render();
-        return;
-      }
-      if (key.name === 'up' || key.name === 'k') {
-        selectedIndex = (selectedIndex - 1 + suggestions.length) % suggestions.length;
-        render();
-      }
-      if (key.name === 'down' || key.name === 'j') {
-        selectedIndex = (selectedIndex + 1) % suggestions.length;
-        render();
-      }
-      if (digitPattern.test(key.name)) {
-        const index = Number(key.name) - 1;
-        if (index < suggestions.length) {
-          if (toggled.has(index)) toggled.delete(index);
-          else toggled.add(index);
-          selectedIndex = index;
+      void (async () => {
+        if (key.ctrl && key.name === 'c') return finish('quit');
+        if (key.name === 'q' || key.name === 'escape') return finish('quit');
+        if (key.name === 'a') return finish('all');
+        if (key.name === 'return') return commitToggles();
+        if (key.name === 'x') {
+          const indexSet = new Set(toggled.size > 0 ? [...toggled] : [selectedIndex]);
+          const excluded = remaining.filter((_, index) => indexSet.has(index));
+          if (onExclude) await onExclude(excluded);
+          remaining = remaining.filter((_, index) => !indexSet.has(index));
+          toggled.clear();
+          if (remaining.length === 0) return finish('quit');
+          selectedIndex = Math.min(selectedIndex, remaining.length - 1);
+          render();
+          return;
+        }
+        if (key.name === 'space') {
+          if (toggled.has(selectedIndex)) toggled.delete(selectedIndex);
+          else toggled.add(selectedIndex);
+          render();
+          return;
+        }
+        if (key.name === 'up' || key.name === 'k') {
+          selectedIndex = (selectedIndex - 1 + remaining.length) % remaining.length;
           render();
         }
-      }
+        if (key.name === 'down' || key.name === 'j') {
+          selectedIndex = (selectedIndex + 1) % remaining.length;
+          render();
+        }
+        if (digitPattern().test(key.name)) {
+          const index = Number(key.name) - 1;
+          if (index < remaining.length) {
+            if (toggled.has(index)) toggled.delete(index);
+            else toggled.add(index);
+            selectedIndex = index;
+            render();
+          }
+        }
+      })();
     });
     renderer.on('resize', render);
     render();

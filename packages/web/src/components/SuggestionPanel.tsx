@@ -5,7 +5,7 @@ interface Props {
   suggestions: Suggestion[];
   activeMode: SuggestionMode;
   onGenerate: (mode: SuggestionMode) => void;
-  onRecord: (mode: string, title: string) => void;
+  onRecord: (mode: string, title: string, extras?: { verdict?: string }) => void;
 }
 
 const MODES: SuggestionMode[] = ['balanced', 'growth', 'ux', 'technical', 'wild'];
@@ -56,12 +56,18 @@ export function SuggestionPanel({ suggestions, activeMode, onGenerate, onRecord 
                 {copied === i ? 'Copied' : 'Copy'}
               </button>
               {s.prompt}
-              <div style={{ marginTop: '0.75rem' }}>
+              <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
                 <button
                   className="btn btn-sm"
                   onClick={() => onRecord(activeMode, s.title)}
                 >
                   Record selection
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => onRecord(activeMode, s.title, { verdict: 'excluded' })}
+                >
+                  Exclude
                 </button>
               </div>
             </div>

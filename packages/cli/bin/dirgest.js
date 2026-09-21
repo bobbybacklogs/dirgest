@@ -3,7 +3,7 @@
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
-import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory, selectedSuggestionEntries, askHistoryEntry } from '@dirgest/sdk';
+import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory, selectedSuggestionEntries, askHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions, isExcludeChoice } from '@dirgest/sdk';
 import { promptForSelection, promptToSaveAskChoice } from '../lib/selection.js';
 import { browseSuggestions, renderAskResponse, renderError, renderFeatureReview, renderHeader, renderHistory, renderInspection, renderPrompts, renderSuggestions } from '../lib/ui.js';
 import { maybeUpdate } from '../lib/update.js';
@@ -32,7 +32,7 @@ Usage:
 Options:
   -d, --dir <directory>  Directory to inspect (defaults to current directory)
   --inspect          Scan a directory and report its tech stack and project signals
-    -s, --suggest [mode]   Generate balanced suggestions, or target growth, ux, technical, or wild ideas
+  -s, --suggest [mode]   Generate balanced suggestions, or target growth, ux, technical, or wild ideas
       --suggestions      Generate balanced feature suggestions (legacy alias)
   -a, --ask <question>    Evaluate a feature idea against the codebase; save the choice to history when asked
   -r, --review <file>     Review a .md or .txt feature list against the codebase (implies --crawl)
@@ -164,32 +164,77 @@ async function main() {
         process.stdout.write('Saved to history. Later suggestions and ask checks will remember this choice.\n');
       }
     } else {
-      const suggestions = await getSuggestions(project, { mock: options.mock, mode: options.suggestionMode });
-      process.stdout.write(`${renderSuggestions(suggestions)}\n`);
-      let choice;
-      if (process.stdin.isTTY && process.stdout.isTTY) {
-        try {
-          choice = await browseSuggestions(suggestions, project);
-        } catch (error) {
-          const message = error.message?.includes('native FFI is not available')
-            ? `OpenTUI requires Node 26.4+; current runtime is ${process.version}. Using the basic terminal picker instead.`
-            : 'OpenTUI could not start; using the basic terminal picker instead.';
-          process.stderr.write(`${renderError(message)}\n`);
-          choice = await promptForSelection(process.stdin, process.stdout, { interactive: true, count: suggestions.length });
-        }
-      } else {
-        choice = await promptForSelection(process.stdin, process.stdout, { interactive: false, count: suggestions.length });
+      const suggestions = withoutExcludedSuggestions(
+        await getSuggestions(project, { mock: options.mock, mode: options.suggestionMode }),
+        await readHistory(project.directory),
+      );
+      if (suggestions.length === 0) {
+        process.stdout.write('\nEvery idea in this batch is already excluded. Use --history to review them.\n');
+        return;
       }
-      if (choice === 'quit') {
-        // No prompts and no history for an explicit quit.
-      } else {
-        const selected = selectedSuggestionEntries(choice, suggestions);
+      let remaining = suggestions;
+      let excludedCount = 0;
+      const persistExclusions = async (entries) => {
+        for (const { suggestion } of entries) {
+          await writeHistory(project.directory, excludeHistoryEntry(options.suggestionMode, suggestion.title));
+        }
+        excludedCount += entries.length;
+      };
+      while (remaining.length > 0) {
+        process.stdout.write(`${renderSuggestions(remaining)}\n`);
+        let choice;
+        if (process.stdin.isTTY && process.stdout.isTTY) {
+          try {
+            choice = await browseSuggestions(remaining, project, {
+              onExclude: async (items) => {
+                await persistExclusions(items.map((suggestion) => ({ suggestion })));
+              },
+            });
+            remaining = withoutExcludedSuggestions(remaining, await readHistory(project.directory));
+            if (choice === 'quit') {
+              if (excludedCount > 0) process.stdout.write(`\nExcluded ${excludedCount} idea${excludedCount === 1 ? '' : 's'} from later suggestions.\n`);
+              break;
+            }
+            if (isExcludeChoice(choice)) {
+              await persistExclusions(selectedSuggestionEntries(choice, remaining));
+              remaining = withoutExcludedSuggestions(remaining, await readHistory(project.directory));
+              if (remaining.length === 0) {
+                process.stdout.write('\nExcluded the remaining ideas from later suggestions.\n');
+                break;
+              }
+              continue;
+            }
+          } catch (error) {
+            const message = error.message?.includes('native FFI is not available')
+              ? `OpenTUI requires Node 26.4+; current runtime is ${process.version}. Using the basic terminal picker instead.`
+              : 'OpenTUI could not start; using the basic terminal picker instead.';
+            process.stderr.write(`${renderError(message)}\n`);
+            choice = await promptForSelection(process.stdin, process.stdout, { interactive: true, count: remaining.length });
+          }
+        } else {
+          choice = await promptForSelection(process.stdin, process.stdout, { interactive: false, count: remaining.length });
+        }
+        if (choice === 'quit') {
+          if (excludedCount > 0) process.stdout.write(`\nExcluded ${excludedCount} idea${excludedCount === 1 ? '' : 's'} from later suggestions.\n`);
+          break;
+        }
+        if (isExcludeChoice(choice)) {
+          const excluded = selectedSuggestionEntries(choice, remaining);
+          await persistExclusions(excluded);
+          remaining = withoutExcludedSuggestions(remaining, await readHistory(project.directory));
+          if (excluded.length === 1) process.stdout.write(`Excluded "${excluded[0].suggestion.title}" from later suggestions.\n`);
+          else process.stdout.write(`Excluded ${excluded.length} ideas from later suggestions.\n`);
+          if (remaining.length === 0) break;
+          continue;
+        }
+        const selected = selectedSuggestionEntries(choice, remaining);
         if (selected.length > 0) {
           process.stdout.write(`\n${renderPrompts(selected.map(({ suggestion }) => suggestion), selected.map(({ index }) => index))}\n`);
           for (const { suggestion } of selected) {
             await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestion.title });
           }
         }
+        break;
       }
     }
   } catch (error) {

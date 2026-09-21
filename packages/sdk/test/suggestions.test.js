@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { attemptWithCandidateModels, bridgeModelCandidates, buildModelHitchClientOptions, createModelSession, getAskResponse, getSuggestions, isRetryableModelError, lanesFromPolicy, resolveBridgeConfiguration, resolveModelConfiguration, validateAskResponse, validateSuggestions } from '@dirgest/sdk/lib/suggestions.js';
 import { ModelHitchError } from 'modelhitch';
-import { parseSelection, selectedSuggestionEntries } from '@dirgest/sdk/lib/selection-internal.js';
+import { parseSelection, selectedSuggestionEntries, isExcludeChoice } from '@dirgest/sdk/lib/selection-internal.js';
+import { writeHistory, excludeHistoryEntry } from '@dirgest/sdk/lib/history.js';
 
 const prompt = 'Implement this feature while preserving the existing architecture, adding meaningful validation, handling errors, and testing the finished user-facing workflow.';
 test('validateSuggestions accepts strict 3-4 word titles and complete prompts', () => { const suggestions = validateSuggestions({ suggestions: ['Project Health Summary', 'Guided First Run', 'Actionable Error Messages', 'Focused Test Coverage'].map((title) => ({ title, prompt: `${prompt} ${title}` })) }); assert.equal(suggestions.length, 4); });
@@ -13,6 +17,14 @@ test('validateSuggestions rejects a prompt reused across different suggestions',
 });
 test('mock suggestions use strict 3-4 word titles for every mode', async () => { for (const mode of ['balanced', 'growth', 'ux', 'technical', 'wild']) { const suggestions = await getSuggestions({ name: 'dirgest' }, { mock: true, mode }); assert.equal(suggestions.length, 5); for (const suggestion of suggestions) assert.ok(suggestion.title.split(/\s+/).length >= 3 && suggestion.title.split(/\s+/).length <= 4, `${mode}: ${suggestion.title}`); } });
 test('suggestion modes produce distinct deterministic ideas', async () => { const project = { name: 'dirgest' }; const balanced = await getSuggestions(project, { mock: true }); const growth = await getSuggestions(project, { mock: true, mode: 'growth' }); assert.notDeepEqual(growth, balanced); await assert.rejects(getSuggestions(project, { mock: true, mode: 'invalid' }), /Unknown suggestion mode/); });
+test('mock suggestions omit titles already excluded in project history', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dirgest-exclude-'));
+  await writeHistory(directory, excludeHistoryEntry('balanced', 'Project Health Summary'));
+  const suggestions = await getSuggestions({ name: 'dirgest', directory }, { mock: true });
+  assert.equal(suggestions.some((suggestion) => suggestion.title === 'Project Health Summary'), false);
+  assert.equal(suggestions.length, 4);
+  await fs.rm(directory, { recursive: true, force: true });
+});
 test('ModelHitch credential configuration is preferred over the default provider', () => { const hitch = { providers: [{ id: 'openai', defaultModel: 'gpt-4o-mini', apiKeyEnvVar: 'OPENAI_API_KEY' }, { id: 'groq', defaultModel: 'llama-3.3-70b-versatile', apiKeyEnvVar: 'GROQ_API_KEY' }] }; assert.deepEqual(resolveModelConfiguration(hitch, { GROQ_API_KEY: 'configured-key' }), { provider: 'groq', model: 'llama-3.3-70b-versatile', usesModelHitchConfiguration: true }); });
 test('ModelHitch V2 OpenAI-compatible providers expose credentials via config', () => {
   const hitch = {
@@ -163,6 +175,14 @@ test('parseSelection accepts unique comma- or space-separated numbers', () => {
   assert.deepEqual(parseSelection('1,5,1', 6), [0, 4]);
   assert.deepEqual(parseSelection('6 2', 6), [5, 1]);
   assert.equal(parseSelection('1, 7', 6), null);
+});
+test('parseSelection treats x-prefixed numbers as exclusions', () => {
+  assert.deepEqual(parseSelection('x2', 5), { exclude: [1] });
+  assert.deepEqual(parseSelection('x 1, 5', 6), { exclude: [0, 4] });
+  assert.equal(parseSelection('x', 5), null);
+  assert.equal(parseSelection('x9', 5), null);
+  assert.equal(isExcludeChoice(parseSelection('x1', 5)), true);
+  assert.equal(isExcludeChoice([0]), false);
 });
 test('selectedSuggestionEntries maps all and multi-select onto original indexes', () => {
   const suggestions = ['one', 'two', 'three', 'four', 'five', 'six'].map((title) => ({ title, prompt }));

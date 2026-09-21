@@ -37,7 +37,9 @@ Pass `{ mock: true }` to any of these for deterministic offline output — no ne
 | `getAskResponse(project, question, opts)` | Fit verdict, reasoning, prompt or alternative |
 | `reviewFeatures(project, features, opts)` | Split a feature list into fits and misfits |
 | `readFeatureFile(path)` | Read and parse a `.md` / `.txt` feature list |
-| `readHistory` · `writeHistory` · `clearHistory` | Selection feedback loop |
+| `readHistory` · `writeHistory` · `clearHistory` | Selection and exclusion feedback loop |
+| `excludeHistoryEntry(mode, title)` | History payload for a dismissed suggestion |
+| `withoutExcludedSuggestions(ideas, history)` | Drop ideas the project already excluded |
 | `askHistoryEntry(question, response)` | History payload for a saved `--ask` verdict |
 
 Types are documented as JSDoc in [`lib/types.js`](lib/types.js).

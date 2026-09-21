@@ -139,7 +139,7 @@ export function createRoutes(cache, jobs) {
     const { mode, title, verdict, question, rejected } = await c.req.json();
     if (!title || typeof title !== 'string') return fail('bad-request', 'A "title" string is required.');
     const entry = { mode: mode || 'balanced', title };
-    if (verdict === 'fit' || verdict === 'misfit') entry.verdict = verdict;
+    if (verdict === 'fit' || verdict === 'misfit' || verdict === 'excluded') entry.verdict = verdict;
     if (typeof question === 'string' && question.trim()) entry.question = question.trim();
     if (typeof rejected === 'string' && rejected.trim()) entry.rejected = rejected.trim();
     await writeHistory(context.directory, entry);

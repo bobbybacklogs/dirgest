@@ -30,6 +30,7 @@ test('renderSuggestions numbers every suggestion from 1 through the real count',
   assert.match(six, /Choose 1-6/);
   const five = renderSuggestions(suggestions.slice(0, 5));
   assert.match(five, /Choose 1-5/);
+  assert.match(five, /x1 or x 1,5 to exclude/);
   assert.doesNotMatch(five, /Choose 1-6/);
 });
 

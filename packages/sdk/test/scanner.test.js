@@ -8,11 +8,13 @@ import { inspectProject, buildProjectContext, filePriority, sortByPriority, dete
 test('inspectProject derives metadata and excludes sensitive or ignored files', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'dirgest-'));
   await mkdir(path.join(directory, 'node_modules'));
+  await mkdir(path.join(directory, '.dirgest'));
   await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: 'sample-app', scripts: { test: 'node --test' } }));
   await writeFile(path.join(directory, 'README.md'), '# Sample App\nUseful context');
   await writeFile(path.join(directory, 'index.js'), 'export const active = true;');
   await writeFile(path.join(directory, '.env'), 'TOP_SECRET=never-send');
   await writeFile(path.join(directory, 'node_modules', 'hidden.js'), 'never-send');
+  await writeFile(path.join(directory, '.dirgest', 'history.json'), JSON.stringify([{ title: 'never-send-history' }]));
   const project = await inspectProject(directory);
   assert.equal(project.name, 'sample-app');
   assert.deepEqual(project.metadata.scripts, ['test']);

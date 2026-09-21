@@ -33,9 +33,9 @@ export function HistoryPanel({ history, onClear }: Props) {
       ) : (
         <ul className="history-list">
           {history.map((entry, i) => (
-            <li key={i} className="history-item">
+            <li key={i} className={`history-item${entry.verdict === 'excluded' ? ' excluded' : ''}`}>
               <span className="history-date">{formatDate(entry.timestamp)}</span>
-              <span className="history-mode">{entry.mode}</span>
+              <span className="history-mode">{entry.verdict === 'excluded' ? 'excluded' : entry.mode}</span>
               <span className="history-title">{entry.title}</span>
             </li>
           ))}

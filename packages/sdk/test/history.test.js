@@ -3,7 +3,7 @@ import test from 'node:test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath, titleFromPrompt, askHistoryEntry } from '@dirgest/sdk/lib/history.js';
+import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath, titleFromPrompt, askHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions } from '@dirgest/sdk/lib/history.js';
 
 let tempDir;
 
@@ -116,6 +116,37 @@ test('askHistoryEntry records accepted ideas and recommended alternatives', () =
   assert.equal(misfit.rejected, 'hardware dongle');
   assert.ok(misfit.title.startsWith('a project health summary dashboard'));
   assert.ok(misfit.title.length <= 80);
+});
+
+test('writeHistory skips duplicate excluded titles', async () => {
+  await writeHistory(tempDir, excludeHistoryEntry('balanced', 'Project Health Summary'));
+  await writeHistory(tempDir, excludeHistoryEntry('ux', 'Project Health Summary'));
+  const history = await readHistory(tempDir);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].verdict, 'excluded');
+  assert.equal(history[0].mode, 'balanced');
+});
+
+test('withoutExcludedSuggestions drops matching titles case-insensitively', () => {
+  const suggestions = [
+    { title: 'Project Health Summary', prompt: 'x'.repeat(80) },
+    { title: 'Guided First Run', prompt: 'x'.repeat(80) },
+  ];
+  const filtered = withoutExcludedSuggestions(suggestions, [excludeHistoryEntry('balanced', 'project health summary')]);
+  assert.deepEqual(filtered.map((suggestion) => suggestion.title), ['Guided First Run']);
+});
+
+test('formatHistoryForPrompt lists excluded ideas separately', () => {
+  const history = [
+    { timestamp: new Date('2025-01-15T10:00:00Z').getTime(), mode: 'balanced', title: 'Project Health' },
+    { timestamp: new Date('2025-01-16T10:00:00Z').getTime(), mode: 'ux', title: 'Faster Workflows', verdict: 'excluded' },
+  ];
+  const result = formatHistoryForPrompt(history);
+  assert.ok(result.includes('Previously selected suggestions'));
+  assert.ok(result.includes('(balanced) Project Health'));
+  assert.ok(result.includes('Previously excluded suggestions'));
+  assert.ok(result.includes('(ux) Faster Workflows'));
+  assert.ok(result.indexOf('excluded suggestions') < result.lastIndexOf('Faster Workflows'));
 });
 
 test('formatHistoryForPrompt describes ask fits and misfits', () => {

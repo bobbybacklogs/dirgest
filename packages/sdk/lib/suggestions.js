@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { buildCooldownFromConfig, defaultProviders, isMaskedSecret, MemoryKeyStore, ModelHitch, readConfigFile } from 'modelhitch';
-import { readHistory, formatHistoryForPrompt } from './history.js';
+import { readHistory, formatHistoryForPrompt, withoutExcludedSuggestions } from './history.js';
 
 const FEATURE_SCHEMA = { type: 'object', additionalProperties: false, required: ['suggestions'], properties: { suggestions: { type: 'array', minItems: 4, maxItems: 6, items: { type: 'object', additionalProperties: false, required: ['title', 'prompt'], properties: { title: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 &/-]{2,59}$' }, prompt: { type: 'string', minLength: 80 } } } } } };
 const MODE_INSTRUCTIONS = {
@@ -314,10 +314,15 @@ function buildAskMessages(project, question, historyContext) {
   return [{ role: 'system', content: askSystemPrompt() }, { role: 'user', content: `Project metadata:\n${JSON.stringify(project.metadata)}${summaryBlock}\n\nBounded project sample:\n${project.sample || '(No readable project files detected.)'}${historyContext}\n\nFeature idea: ${question.trim()}` }];
 }
 
+async function loadHistory(project) {
+  if (!project?.directory) return [];
+  return readHistory(project.directory);
+}
+
 export async function getSuggestions(project, { mock = false, mode = 'balanced', environment = process.env } = {}) {
   if (!Object.hasOwn(MODE_INSTRUCTIONS, mode)) throw new Error(`Unknown suggestion mode: ${mode}.`);
-  if (mock) return mockSuggestions(project, mode);
-  const history = await readHistory(project.directory);
+  const history = await loadHistory(project);
+  if (mock) return withoutExcludedSuggestions(mockSuggestions(project, mode), history);
   const historyContext = formatHistoryForPrompt(history);
   const { hitch, configuration, candidates } = await createModelSession(environment);
   const { provider, credentials } = configuration;
@@ -327,11 +332,11 @@ export async function getSuggestions(project, { mock = false, mode = 'balanced',
     const { model: successfulModel, result } = await attemptWithCandidateModels(task, candidates);
     const content = result.message?.content;
     try {
-      return validateSuggestions(parseContent(content));
+      return withoutExcludedSuggestions(validateSuggestions(parseContent(content)), history);
     } catch (error) {
       if (!error.message.startsWith('Model response') && !error.message.startsWith('Model returned') && !error.message.startsWith('Suggestion ')) throw error;
       const corrected = await task(successfulModel, buildCorrectionMessages(content, error));
-      return validateSuggestions(parseContent(corrected.message?.content));
+      return withoutExcludedSuggestions(validateSuggestions(parseContent(corrected.message?.content)), history);
     }
   } catch (error) {
     if (error.message.startsWith('Model response') || error.message.startsWith('Model returned') || error.message.startsWith('Suggestion ')) throw error;

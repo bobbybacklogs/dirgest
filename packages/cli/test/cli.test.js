@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -52,6 +52,23 @@ test('update check is skipped for non-interactive terminals', async () => {
 
   assert.equal(result, null);
   assert.equal(fetched, false);
+});
+
+test('--suggest --mock omits titles stored as exclusions in project history', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'dirgest-cli-exclude-'));
+  await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: 'exclude-test' }));
+  await writeFile(path.join(directory, 'index.js'), 'export const ready = true;');
+  const historyDir = path.join(directory, '.dirgest');
+  await mkdir(historyDir);
+  await writeFile(path.join(historyDir, 'history.json'), JSON.stringify([{ timestamp: Date.now(), mode: 'balanced', title: 'Project Health Summary', verdict: 'excluded' }]));
+  const result = spawnSync(process.execPath, ['bin/dirgest.js', '--suggest', '--mock', '--dir', directory], {
+    cwd: packageDirectory,
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /Project Health Summary/);
+  assert.match(result.stdout, /Guided First Run/);
 });
 
 test('--crawl builds broad context before generating offline suggestions', async () => {

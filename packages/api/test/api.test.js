@@ -251,6 +251,17 @@ test('POST /projects/:id/history records a selection', async () => {
   assert.equal(listedData.history[0].question, 'add dark mode toggle');
 });
 
+test('POST /projects/:id/history records an excluded suggestion', async () => {
+  const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'exclude.js', content: '{}' }], name: 'exclude-project' });
+  const { data: { id } } = await insp.json();
+  const res = await req('POST', `/api/v1/projects/${id}/history`, { mode: 'balanced', title: 'Project Health Summary', verdict: 'excluded' });
+  assert.equal(res.status, 200);
+  const listed = await req('GET', `/api/v1/projects/${id}/history`);
+  const { data: listedData } = await listed.json();
+  const excluded = listedData.history.filter((entry) => entry.verdict === 'excluded');
+  assert.equal(excluded.at(-1)?.title, 'Project Health Summary');
+});
+
 test('DELETE /projects/:id/history clears history', async () => {
   const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'a.js', content: '{}' }], name: 'a' });
   const { data: { id } } = await insp.json();

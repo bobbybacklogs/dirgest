@@ -48,11 +48,11 @@ dirgest --history                      # what you've picked before
 | `-d, --dir <path>` | Target a different project (defaults to cwd) |
 | `--crawl` | Map up to 2,000 files and sample 96 across directories |
 | `--mock` | Deterministic offline output — no API key needed |
-| `--history` / `--clear-history` | Read or wipe `.dirgest/history.json` |
+| `--history` / `--clear-history` | Read or wipe `.dirgest/history.json` (selections and exclusions) |
 
-In a real terminal, suggestions open in an interactive browser — `↑`/`↓` or `j`/`k` to preview, `Enter` or `1`–`6` to pick, `a` for all, `q` to quit. Needs Node 26.4+; older versions fall back to a plain picker automatically.
+In a real terminal, suggestions open in an interactive browser — `↑`/`↓` or `j`/`k` to preview, `Enter` or `1`–`6` to pick, `x` to exclude, `a` for all, `q` to quit. Needs Node 26.4+; older versions fall back to a plain picker automatically.
 
-Selections are remembered in `.dirgest/history.json` and fed back into later prompts, so dirgest stops repeating ground you've already covered. `--ask` offers the same save step after a good fit, or after you take the recommended alternative on a miss.
+Selections and exclusions are remembered in `.dirgest/history.json` and fed back into later prompts, so dirgest stops repeating ground you've already covered or dismissed. `--ask` offers the same save step after a good fit, or after you take the recommended alternative on a miss.
 
 <br>
 
@@ -158,7 +158,7 @@ Files are ranked by architectural importance before sampling, so the model spend
 6  tests
 ```
 
-Dirgest also derives a project analysis — language, framework, project type, entry points, and notable dependencies — and sends that alongside the sample so the model understands the project before it reads code. Nothing is persisted except the selections you make.
+Dirgest also derives a project analysis — language, framework, project type, entry points, and notable dependencies — and sends that alongside the sample so the model understands the project before it reads code. Nothing is persisted except the selections and exclusions you make.
 
 </details>
 

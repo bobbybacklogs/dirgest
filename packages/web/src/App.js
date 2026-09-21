@@ -95,7 +95,13 @@ export function App() {
             await api.recordHistory(project.id, mode, title, extras);
             const result = await api.getHistory(project.id);
             setHistory(result.history);
-            showToast('Recorded');
+            if (extras?.verdict === 'excluded') {
+                setSuggestions((current) => current.filter((suggestion) => suggestion.title !== title));
+                showToast('Excluded');
+            }
+            else {
+                showToast('Recorded');
+            }
         }
         catch {
             showToast('Failed to record');

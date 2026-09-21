@@ -101,14 +101,14 @@
  * @property {number} timestamp - Unix timestamp (Date.now()) when the selection was made
  * @property {string} mode - The suggestion mode used when the selection was made
  * @property {string} title - The title of the selected suggestion
- * @property {'fit'|'misfit'} [verdict] - Ask-mode verdict when the entry came from `--ask`
+ * @property {'fit'|'misfit'|'excluded'} [verdict] - Ask-mode verdict, or `excluded` when the user dismissed a suggestion
  * @property {string} [question] - Original ask question
  * @property {string} [rejected] - Original idea that was not a fit
  */
 
 /**
  * @typedef {Object} SuggestionOptions
- * @property {boolean} [mock=false] - Use deterministic offline suggestions (skips LLM and history)
+ * @property {boolean} [mock=false] - Use deterministic offline suggestions (skips LLM; still honors excluded history)
  * @property {SuggestionMode} [mode='balanced'] - Suggestion generation mode
  */
 
