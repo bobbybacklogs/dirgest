@@ -83,6 +83,7 @@ export interface HistoryEntry {
   verdict?: 'fit' | 'misfit' | 'excluded';
   question?: string;
   rejected?: string;
+  prompt?: string;
 }
 
 export interface ApiResponse<T> {

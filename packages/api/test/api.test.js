@@ -251,6 +251,18 @@ test('POST /projects/:id/history records a selection', async () => {
   assert.equal(listedData.history[0].question, 'add dark mode toggle');
 });
 
+test('POST /projects/:id/history records a coding prompt with the selection', async () => {
+  const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'save.js', content: '{}' }], name: 'save-project' });
+  const { data: { id } } = await insp.json();
+  const prompt = 'Implement a project health summary dashboard that uses existing project conventions and tests.';
+  const res = await req('POST', `/api/v1/projects/${id}/history`, { mode: 'growth', title: 'Project Health Summary', prompt });
+  assert.equal(res.status, 200);
+  const listed = await req('GET', `/api/v1/projects/${id}/history`);
+  const { data: listedData } = await listed.json();
+  const saved = listedData.history.filter((entry) => entry.title === 'Project Health Summary' && entry.prompt === prompt);
+  assert.equal(saved.length >= 1, true);
+});
+
 test('POST /projects/:id/history records an excluded suggestion', async () => {
   const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'exclude.js', content: '{}' }], name: 'exclude-project' });
   const { data: { id } } = await insp.json();

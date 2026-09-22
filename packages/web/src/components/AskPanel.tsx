@@ -4,7 +4,7 @@ import type { AskResponse } from '../types';
 interface Props {
   response: AskResponse | null;
   onAsk: (question: string) => void;
-  onSave?: (title: string, question: string, fit: boolean) => void;
+  onSave?: (title: string, question: string, fit: boolean, prompt: string) => void;
 }
 
 function titleFromAsk(question: string, response: AskResponse): string {
@@ -42,9 +42,10 @@ export function AskPanel({ response, onAsk, onSave }: Props) {
         <div className="card-header">
           <span className="card-title">Ask about a feature idea</span>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <p className="card-subtitle">Dirgest will say whether the idea fits this codebase, and save the prompt if you want it later.</p>
+        <div className="filter-row">
           <input
-            className="ask-input"
+            className="ask-input grow"
             placeholder="e.g. Add dark mode toggle, Integrate Stripe payments, Add real-time collaboration"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -81,7 +82,7 @@ export function AskPanel({ response, onAsk, onSave }: Props) {
                     className="btn btn-sm"
                     disabled={saved}
                     onClick={() => {
-                      onSave(titleFromAsk(lastQuestion, response), lastQuestion, true);
+                      onSave(titleFromAsk(lastQuestion, response), lastQuestion, true, response.prompt);
                       setSaved(true);
                     }}
                   >
@@ -108,7 +109,7 @@ export function AskPanel({ response, onAsk, onSave }: Props) {
                     className="btn btn-sm"
                     disabled={saved}
                     onClick={() => {
-                      onSave(titleFromAsk(lastQuestion, response), lastQuestion, false);
+                      onSave(titleFromAsk(lastQuestion, response), lastQuestion, false, response.alternative);
                       setSaved(true);
                     }}
                   >

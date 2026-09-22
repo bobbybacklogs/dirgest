@@ -54,6 +54,20 @@ export async function writeHistory(projectDirectory, entry) {
   return trimmed;
 }
 
+export function savedPromptEntries(history) {
+  return (history || []).filter((entry) => {
+    if (isExcludedEntry(entry)) return false;
+    return typeof entry.prompt === 'string' && entry.prompt.trim().length > 0;
+  });
+}
+
+export function formatSavedPrompts(entries) {
+  return savedPromptEntries(entries).map((entry, index) => {
+    const mode = entry.mode || 'balanced';
+    return `${index + 1}. ${entry.title} (${mode})\n${entry.prompt.trim()}`;
+  }).join('\n\n');
+}
+
 export async function clearHistory(projectDirectory) {
   await fs.rm(path.join(projectDirectory, HISTORY_DIR), { recursive: true, force: true });
 }
@@ -73,14 +87,22 @@ export function titleFromPrompt(text, fallback = 'Recommended alternative') {
 export function askHistoryEntry(question, response) {
   const trimmedQuestion = String(question || '').trim();
   if (response?.fit) {
-    return { mode: 'ask', title: trimmedQuestion, verdict: 'fit', question: trimmedQuestion };
+    return {
+      mode: 'ask',
+      title: trimmedQuestion,
+      verdict: 'fit',
+      question: trimmedQuestion,
+      ...(typeof response.prompt === 'string' && response.prompt.trim() ? { prompt: response.prompt.trim() } : {}),
+    };
   }
+  const alternative = typeof response?.alternative === 'string' ? response.alternative.trim() : '';
   return {
     mode: 'ask',
     title: titleFromPrompt(response?.alternative, trimmedQuestion || 'Recommended alternative'),
     verdict: 'misfit',
     question: trimmedQuestion,
     rejected: trimmedQuestion,
+    ...(alternative ? { prompt: alternative } : {}),
   };
 }
 

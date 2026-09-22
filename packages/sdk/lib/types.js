@@ -103,7 +103,7 @@
  * @property {string} title - The title of the selected suggestion
  * @property {'fit'|'misfit'|'excluded'} [verdict] - Ask-mode verdict, or `excluded` when the user dismissed a suggestion
  * @property {string} [question] - Original ask question
- * @property {string} [rejected] - Original idea that was not a fit
+ * @property {string} [prompt] - Full coding prompt saved with the selection, when one was recorded
  */
 
 /**

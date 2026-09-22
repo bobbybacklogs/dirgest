@@ -78,7 +78,7 @@ export async function recordHistory(
   id: string,
   mode: string,
   title: string,
-  extras?: { verdict?: string; question?: string; rejected?: string },
+  extras?: { verdict?: string; question?: string; rejected?: string; prompt?: string },
 ): Promise<void> {
   await request<{ recorded: boolean }>(`/api/v1/projects/${id}/history`, {
     method: 'POST',

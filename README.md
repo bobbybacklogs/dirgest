@@ -94,7 +94,7 @@ Misfits come with the specific reason and a better-fitting alternative. Good fit
 npx @dirgest/api
 ```
 
-Opens on [localhost:3940](http://localhost:3940). Drop in a project, then use the same five capabilities from the browser — inspect, suggest, ask, review a list, and history.
+Opens on [localhost:3940](http://localhost:3940). Drop in a project, then use the same capabilities from the browser — inspect, suggest, ask, review a list, collect saved prompts, and history.
 
 <br>
 

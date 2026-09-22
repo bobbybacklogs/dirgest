@@ -3,7 +3,7 @@ import test from 'node:test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath, titleFromPrompt, askHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions } from '@dirgest/sdk/lib/history.js';
+import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath, titleFromPrompt, askHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions, savedPromptEntries, formatSavedPrompts } from '@dirgest/sdk/lib/history.js';
 
 let tempDir;
 
@@ -108,14 +108,16 @@ test('titleFromPrompt strips leading verbs and truncates long sentences', () => 
 });
 
 test('askHistoryEntry records accepted ideas and recommended alternatives', () => {
-  const fit = askHistoryEntry('add dark mode toggle', { fit: true, prompt: 'Implement dark mode for the app with tests and existing theme tokens in place here.' });
-  assert.deepEqual(fit, { mode: 'ask', title: 'add dark mode toggle', verdict: 'fit', question: 'add dark mode toggle' });
+  const fitPrompt = 'Implement dark mode for the app with tests and existing theme tokens in place here.';
+  const fit = askHistoryEntry('add dark mode toggle', { fit: true, prompt: fitPrompt });
+  assert.deepEqual(fit, { mode: 'ask', title: 'add dark mode toggle', verdict: 'fit', question: 'add dark mode toggle', prompt: fitPrompt });
   const misfit = askHistoryEntry('hardware dongle', { fit: false, alternative: 'Implement a project health summary dashboard that surfaces recent changes and metrics from the existing codebase.' });
   assert.equal(misfit.mode, 'ask');
   assert.equal(misfit.verdict, 'misfit');
   assert.equal(misfit.rejected, 'hardware dongle');
   assert.ok(misfit.title.startsWith('a project health summary dashboard'));
   assert.ok(misfit.title.length <= 80);
+  assert.equal(misfit.prompt, 'Implement a project health summary dashboard that surfaces recent changes and metrics from the existing codebase.');
 });
 
 test('writeHistory skips duplicate excluded titles', async () => {
@@ -157,4 +159,24 @@ test('formatHistoryForPrompt describes ask fits and misfits', () => {
   const result = formatHistoryForPrompt(history);
   assert.ok(result.includes('Accepted "dark mode toggle"'));
   assert.ok(result.includes('Chose "health dashboard" instead of "hardware dongle"'));
+});
+
+test('writeHistory stores the full coding prompt with a selection', async () => {
+  const prompt = 'Implement a project health summary dashboard with tests and existing conventions.';
+  await writeHistory(tempDir, { mode: 'growth', title: 'Project Health Summary', prompt });
+  const history = await readHistory(tempDir);
+  assert.equal(history[0].prompt, prompt);
+});
+
+test('savedPromptEntries omits exclusions and entries without prompts', () => {
+  const prompt = 'Implement a guided first run that walks through setup and validation.';
+  const history = [
+    { timestamp: 1, mode: 'balanced', title: 'Guided First Run', prompt },
+    { timestamp: 2, mode: 'ux', title: 'Faster Workflows', verdict: 'excluded' },
+    { timestamp: 3, mode: 'technical', title: 'No Prompt Saved' },
+  ];
+  const saved = savedPromptEntries(history);
+  assert.deepEqual(saved.map((entry) => entry.title), ['Guided First Run']);
+  assert.match(formatSavedPrompts(history), /1\. Guided First Run \(balanced\)/);
+  assert.match(formatSavedPrompts(history), /guided first run/);
 });

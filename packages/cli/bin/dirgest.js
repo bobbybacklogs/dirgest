@@ -231,7 +231,7 @@ async function main() {
         if (selected.length > 0) {
           process.stdout.write(`\n${renderPrompts(selected.map(({ suggestion }) => suggestion), selected.map(({ index }) => index))}\n`);
           for (const { suggestion } of selected) {
-            await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestion.title });
+            await writeHistory(project.directory, { mode: options.suggestionMode, title: suggestion.title, prompt: suggestion.prompt });
           }
         }
         break;
