@@ -1,0 +1,7 @@
+test/
+coverage/
+.env
+.env.*
+*.log
+exclude-project/
+save-project/
