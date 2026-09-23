@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   ProjectContext,
   Suggestion,
@@ -35,17 +35,20 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 function readMockPreference(): boolean {
   try {
-    return window.localStorage.getItem('dirgest.mock') !== '0';
+    return window.localStorage.getItem('dirgest.offlineMock') === '1';
   } catch {
-    return true;
+    return false;
   }
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
 }
 
 export function App() {
   const [project, setProject] = useState<ProjectState | null>(null);
   const [tab, setTab] = useState<Tab>('understand');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [suggestionCache, setSuggestionCache] = useState<Partial<Record<SuggestionMode, Suggestion[]>>>({});
   const [activeMode, setActiveMode] = useState<SuggestionMode>('balanced');
   const [askResponse, setAskResponse] = useState<AskResponse | null>(null);
   const [review, setReview] = useState<FeatureReview | null>(null);
@@ -53,13 +56,11 @@ export function App() {
   const [loading, setLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [mock, setMock] = useState(readMockPreference);
+  const generateAbort = useRef<AbortController | null>(null);
+  const generateSeq = useRef(0);
 
   const savedCount = useMemo(() => savedPromptEntries(history).length, [history]);
   const savedTitles = useMemo(() => savedTitleSet(history), [history]);
-  const cachedModes = useMemo(
-    () => (Object.keys(suggestionCache) as SuggestionMode[]).filter((mode) => (suggestionCache[mode]?.length ?? 0) > 0),
-    [suggestionCache],
-  );
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -68,7 +69,7 @@ export function App() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('dirgest.mock', mock ? '1' : '0');
+      window.localStorage.setItem('dirgest.offlineMock', mock ? '1' : '0');
     } catch {
       // Ignore private-mode storage failures.
     }
@@ -108,7 +109,6 @@ export function App() {
       );
       setProject({ id: result.id, context: result.context });
       setSuggestions([]);
-      setSuggestionCache({});
       setAskResponse(null);
       setReview(null);
       setTab('understand');
@@ -128,29 +128,26 @@ export function App() {
   const handleGenerateSuggestions = useCallback(
     async (mode: SuggestionMode) => {
       if (!project) return;
-      setLoading(`Generating ${mode} suggestions…`);
+      const seq = ++generateSeq.current;
+      generateAbort.current?.abort();
+      const controller = new AbortController();
+      generateAbort.current = controller;
+      setActiveMode(mode);
+      setTab('suggest');
+      setLoading(mock ? `Generating mock ${mode} placeholders…` : `Generating ${mode} suggestions…`);
       try {
-        const result = await api.getSuggestions(project.id, mode, mock);
+        const result = await api.getSuggestions(project.id, mode, mock, controller.signal);
+        if (seq !== generateSeq.current) return;
         setSuggestions(result.suggestions);
-        setSuggestionCache((current) => ({ ...current, [mode]: result.suggestions }));
-        setActiveMode(mode);
-        setTab('suggest');
       } catch (err) {
+        if (seq !== generateSeq.current || isAbortError(err)) return;
         showToast(err instanceof Error ? err.message : 'Failed to generate suggestions');
       } finally {
-        setLoading(null);
+        if (seq === generateSeq.current) setLoading(null);
       }
     },
     [project, showToast, mock],
   );
-
-  const handleShowCached = useCallback((mode: SuggestionMode) => {
-    const cached = suggestionCache[mode];
-    if (!cached) return;
-    setSuggestions(cached);
-    setActiveMode(mode);
-    setTab('suggest');
-  }, [suggestionCache]);
 
   const handleAsk = useCallback(
     async (question: string) => {
@@ -193,13 +190,6 @@ export function App() {
         setHistory(result.history);
         if (extras?.verdict === 'excluded') {
           setSuggestions((current) => current.filter((suggestion) => suggestion.title !== title));
-          setSuggestionCache((current) => {
-            const next = { ...current };
-            for (const key of Object.keys(next) as SuggestionMode[]) {
-              next[key] = (next[key] ?? []).filter((suggestion) => suggestion.title !== title);
-            }
-            return next;
-          });
           showToast('Excluded');
         } else {
           showToast('Saved');
@@ -237,7 +227,6 @@ export function App() {
   const handleReset = useCallback(() => {
     setProject(null);
     setSuggestions([]);
-    setSuggestionCache({});
     setAskResponse(null);
     setReview(null);
     setHistory([]);
@@ -257,14 +246,22 @@ export function App() {
           </div>
         </div>
         <div className="topbar-actions">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={mock}
-              onChange={(event) => setMock(event.target.checked)}
-            />
-            <span>{mock ? 'Offline mock' : 'Live model'}</span>
-          </label>
+          <div className="source-switch" role="group" aria-label="Suggestion source">
+            <button
+              type="button"
+              className={!mock ? 'active' : ''}
+              onClick={() => setMock(false)}
+            >
+              Live
+            </button>
+            <button
+              type="button"
+              className={mock ? 'active' : ''}
+              onClick={() => setMock(true)}
+            >
+              Mock
+            </button>
+          </div>
           {project && (
             <button className="btn btn-sm" onClick={handleReset}>New project</button>
           )}
@@ -306,6 +303,7 @@ export function App() {
                 history={history}
                 review={review}
                 suggestionCount={suggestions.length}
+                generating={Boolean(loading)}
                 onGenerateSuggestions={handleGenerateSuggestions}
                 onNavigate={openTab}
               />
@@ -314,10 +312,10 @@ export function App() {
               <SuggestionPanel
                 suggestions={suggestions}
                 activeMode={activeMode}
-                cachedModes={cachedModes}
+                mock={mock}
+                generating={Boolean(loading)}
                 savedTitles={savedTitles}
                 onGenerate={handleGenerateSuggestions}
-                onShowCached={handleShowCached}
                 onRecord={handleRecordSelection}
               />
             )}

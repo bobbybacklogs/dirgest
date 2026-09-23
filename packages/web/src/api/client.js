@@ -1,8 +1,10 @@
 const BASE = '';
 async function request(path, init) {
     const res = await fetch(`${BASE}${path}`, {
+        method: init?.method,
+        body: init?.body,
+        signal: init?.signal,
         headers: { 'content-type': 'application/json' },
-        ...init,
     });
     const body = await res.json();
     if (!body.ok)
@@ -18,10 +20,11 @@ export async function inspectUpload(files, name) {
 export async function getProject(id) {
     return request(`/api/v1/projects/${id}`);
 }
-export async function getSuggestions(id, mode, mock = false) {
+export async function getSuggestions(id, mode, mock = false, signal) {
     return request(`/api/v1/projects/${id}/suggestions`, {
         method: 'POST',
         body: JSON.stringify({ mode, mock }),
+        signal,
     });
 }
 export async function askQuestion(id, question, mock = false) {

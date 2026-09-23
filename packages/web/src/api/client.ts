@@ -14,8 +14,10 @@ const BASE = '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
+    method: init?.method,
+    body: init?.body,
+    signal: init?.signal,
     headers: { 'content-type': 'application/json' },
-    ...init,
   });
   const body: ApiResponse<T> = await res.json();
   if (!body.ok) throw new Error(body.error?.message ?? 'Unknown API error');
@@ -40,10 +42,12 @@ export async function getSuggestions(
   id: string,
   mode: SuggestionMode,
   mock = false,
+  signal?: AbortSignal,
 ): Promise<SuggestionsResult> {
   return request<SuggestionsResult>(`/api/v1/projects/${id}/suggestions`, {
     method: 'POST',
     body: JSON.stringify({ mode, mock }),
+    signal,
   });
 }
 

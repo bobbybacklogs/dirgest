@@ -7,6 +7,7 @@ interface Props {
   history: HistoryEntry[];
   review: FeatureReview | null;
   suggestionCount: number;
+  generating?: boolean;
   onGenerateSuggestions: (mode: SuggestionMode) => void;
   onNavigate: (tab: 'suggest' | 'ask' | 'review' | 'saved' | 'history') => void;
 }
@@ -41,6 +42,7 @@ export function ProjectView({
   history,
   review,
   suggestionCount,
+  generating = false,
   onGenerateSuggestions,
   onNavigate,
 }: Props) {
@@ -109,7 +111,12 @@ export function ProjectView({
         </div>
         <div className="mode-selector">
           {MODES.map((mode) => (
-            <button key={mode} className="mode-btn" onClick={() => onGenerateSuggestions(mode)}>
+            <button
+              key={mode}
+              className="mode-btn"
+              disabled={generating}
+              onClick={() => onGenerateSuggestions(mode)}
+            >
               {mode}
             </button>
           ))}

@@ -1,6 +1,6 @@
 {
   "name": "@dirgest/api",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "description": "Dirgest API server",
   "type": "module",
   "keywords": [

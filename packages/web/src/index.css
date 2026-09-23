@@ -120,18 +120,28 @@ select {
   gap: 0.75rem;
 }
 
-.toggle {
+.source-switch {
   display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.78rem;
-  color: var(--text-1);
-  cursor: pointer;
-  user-select: none;
+  padding: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-2);
 }
 
-.toggle input {
-  accent-color: var(--accent);
+.source-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.source-switch button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .hero-kicker {

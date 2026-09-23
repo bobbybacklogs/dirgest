@@ -4,10 +4,10 @@ import type { Suggestion, SuggestionMode } from '../types';
 interface Props {
   suggestions: Suggestion[];
   activeMode: SuggestionMode;
-  cachedModes: SuggestionMode[];
+  mock: boolean;
+  generating: boolean;
   savedTitles: Set<string>;
   onGenerate: (mode: SuggestionMode) => void;
-  onShowCached: (mode: SuggestionMode) => void;
   onRecord: (mode: string, title: string, extras?: { verdict?: string; prompt?: string }) => void;
 }
 
@@ -16,10 +16,10 @@ const MODES: SuggestionMode[] = ['balanced', 'growth', 'ux', 'technical', 'wild'
 export function SuggestionPanel({
   suggestions,
   activeMode,
-  cachedModes,
+  mock,
+  generating,
   savedTitles,
   onGenerate,
-  onShowCached,
   onRecord,
 }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -46,24 +46,21 @@ export function SuggestionPanel({
             <button
               key={mode}
               className={`mode-btn ${mode === activeMode ? 'active' : ''}`}
-              onClick={() => {
-                if (mode !== activeMode && cachedModes.includes(mode)) onShowCached(mode);
-                else onGenerate(mode);
-              }}
+              disabled={generating}
+              onClick={() => onGenerate(mode)}
             >
               {mode}
             </button>
           ))}
         </div>
-        {suggestions.length > 0 && (
-          <button className="btn btn-sm" onClick={() => onGenerate(activeMode)}>
-            Regenerate {activeMode}
-          </button>
-        )}
+        <button className="btn btn-sm" disabled={generating} onClick={() => onGenerate(activeMode)}>
+          Generate {activeMode}
+        </button>
       </div>
       {suggestions.length > 0 && (
         <p className="card-subtitle">
           {suggestions.length} ideas in {activeMode}
+          {mock ? ' · mock placeholders' : ' · live model'}
           {counts.saved > 0 ? ` · ${counts.saved} already saved` : ''}
         </p>
       )}
