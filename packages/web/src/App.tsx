@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   ProjectContext,
   Suggestion,
+  Recommendation,
   SuggestionMode,
   AskResponse,
   FeatureReview,
@@ -48,7 +49,7 @@ function isAbortError(err: unknown): boolean {
 export function App() {
   const [project, setProject] = useState<ProjectState | null>(null);
   const [tab, setTab] = useState<Tab>('understand');
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<Array<Suggestion | Recommendation>>([]);
   const [activeMode, setActiveMode] = useState<SuggestionMode>('balanced');
   const [askResponse, setAskResponse] = useState<AskResponse | null>(null);
   const [review, setReview] = useState<FeatureReview | null>(null);
@@ -148,6 +149,26 @@ export function App() {
     },
     [project, showToast, mock],
   );
+
+  const handleGenerateRecommendations = useCallback(async () => {
+    if (!project) return;
+    const seq = ++generateSeq.current;
+    generateAbort.current?.abort();
+    const controller = new AbortController();
+    generateAbort.current = controller;
+    setTab('suggest');
+    setLoading(mock ? 'Generating mock recommendations…' : 'Generating cross-category recommendations…');
+    try {
+      const result = await api.getRecommendations(project.id, 10, mock, controller.signal);
+      if (seq !== generateSeq.current) return;
+      setSuggestions(result.recommendations);
+    } catch (err) {
+      if (seq !== generateSeq.current || isAbortError(err)) return;
+      showToast(err instanceof Error ? err.message : 'Failed to generate recommendations');
+    } finally {
+      if (seq === generateSeq.current) setLoading(null);
+    }
+  }, [project, showToast, mock]);
 
   const handleAsk = useCallback(
     async (question: string) => {
@@ -316,6 +337,7 @@ export function App() {
                 generating={Boolean(loading)}
                 savedTitles={savedTitles}
                 onGenerate={handleGenerateSuggestions}
+                onRecommend={handleGenerateRecommendations}
                 onRecord={handleRecordSelection}
               />
             )}

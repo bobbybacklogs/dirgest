@@ -18,7 +18,8 @@ Serves on [localhost:3940](http://localhost:3940) — the browser UI at `/` and 
 | `POST /projects/inspect` | Scan a local directory |
 | `POST /projects/inspect/upload` | Build a context from uploaded files |
 | `GET /projects/:id` | Fetch a cached context |
-| `POST /projects/:id/suggestions` | `{ mode?, mock? }` → 4–6 ideas |
+| `POST /projects/:id/suggestions` | `{ mode?, mock? }` → 4–6 ideas (`ai`, `ai-wild`, …) |
+| `POST /projects/:id/recommendations` | `{ count?, mock? }` → 5–20 cross-category picks |
 | `POST /projects/:id/ask` | `{ question, mock? }` → fit verdict |
 | `POST /projects/:id/review` | `{ content, filename }` or `{ features[] }` → fits and misfits |
 | `GET · POST · DELETE /projects/:id/history` | Selection and exclusion history |

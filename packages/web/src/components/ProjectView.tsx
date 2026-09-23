@@ -12,7 +12,7 @@ interface Props {
   onNavigate: (tab: 'suggest' | 'ask' | 'review' | 'saved' | 'history') => void;
 }
 
-const MODES: SuggestionMode[] = ['balanced', 'growth', 'ux', 'technical', 'wild'];
+const MODES: SuggestionMode[] = ['balanced', 'growth', 'ux', 'technical', 'wild', 'ai', 'ai-wild'];
 
 function Field({ label, value }: { label: string; value: string | null }) {
   return (

@@ -3,14 +3,14 @@
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
-import { inspectProject, getAskResponse, getSuggestions, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory, selectedSuggestionEntries, askHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions, isExcludeChoice } from '@dirgest/sdk';
+import { inspectProject, getAskResponse, getSuggestions, getRecommendations, readFeatureFile, reviewFeatures, readHistory, writeHistory, clearHistory, selectedSuggestionEntries, askHistoryEntry, recommendHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions, isExcludeChoice, isValidSuggestionMode } from '@dirgest/sdk';
 import { promptForSelection, promptToSaveAskChoice } from '../lib/selection.js';
-import { browseSuggestions, renderAskResponse, renderError, renderFeatureReview, renderHeader, renderHistory, renderInspection, renderPrompts, renderSuggestions } from '../lib/ui.js';
+import { browseSuggestions, renderAskResponse, renderError, renderFeatureReview, renderHeader, renderHistory, renderInspection, renderPrompts, renderRecommendHeader, renderRecommendations, renderSuggestions } from '../lib/ui.js';
 import { maybeUpdate } from '../lib/update.js';
 
 const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number);
 const canUseOpenTui = nodeMajor > 26 || (nodeMajor === 26 && nodeMinor >= 4);
-const runsSuggestionCommand = process.argv.slice(2).some((argument) => argument === '-s' || argument === '--suggest' || argument === '--suggestions');
+const runsSuggestionCommand = process.argv.slice(2).some((argument) => argument === '-s' || argument === '--suggest' || argument === '--suggestions' || argument === '--recommend');
 
 // OpenTUI's native renderer needs Node's experimental FFI flag. Re-exec only when it is supported.
 if (canUseOpenTui && runsSuggestionCommand && !process.execArgv.includes('--experimental-ffi')) {
@@ -23,7 +23,8 @@ const help = `dirgest - context-aware project feature suggestions
 Usage:
   dirgest --inspect [--dir <directory>]
   dirgest --suggestions [--dir <directory>] [--crawl] [--mock]
-  dirgest --suggest [growth|ux|technical|wild] [--dir <directory>] [--crawl] [--mock]
+  dirgest --suggest [growth|ux|technical|wild|ai|ai-wild] [--dir <directory>] [--crawl] [--mock]
+  dirgest --recommend [--count <5-20>] [--dir <directory>] [--mock]
   dirgest --ask <question> [--dir <directory>] [--crawl] [--mock]
   dirgest --review <file.md|file.txt> [--dir <directory>] [--mock]
   dirgest --history [--dir <directory>]
@@ -32,8 +33,10 @@ Usage:
 Options:
   -d, --dir <directory>  Directory to inspect (defaults to current directory)
   --inspect          Scan a directory and report its tech stack and project signals
-  -s, --suggest [mode]   Generate balanced suggestions, or target growth, ux, technical, or wild ideas
+  -s, --suggest [mode]   Generate balanced suggestions, or target growth, ux, technical, wild, ai, or ai-wild ideas
       --suggestions      Generate balanced feature suggestions (legacy alias)
+      --recommend        Crawl the repo and surface top ideas across every category
+      --count <number>   Number of recommendations to generate (5-20, default 10; use with --recommend)
   -a, --ask <question>    Evaluate a feature idea against the codebase; save the choice to history when asked
   -r, --review <file>     Review a .md or .txt feature list against the codebase (implies --crawl)
        --history          Show previously selected suggestions
@@ -45,7 +48,7 @@ Options:
 `;
 
 function parseArguments(argumentsList) {
-      const options = { directory: process.cwd(), mock: false, crawl: false, noUpdate: false, inspect: false, suggest: false, suggestionMode: 'balanced', help: false, ask: false, askQuestion: '', review: false, reviewFile: '', history: false, clearHistory: false };
+      const options = { directory: process.cwd(), mock: false, crawl: false, noUpdate: false, inspect: false, suggest: false, recommend: false, recommendCount: 10, suggestionMode: 'balanced', help: false, ask: false, askQuestion: '', review: false, reviewFile: '', history: false, clearHistory: false };
   for (let index = 0; index < argumentsList.length; index += 1) {
     const argument = argumentsList[index];
     if (argument === '-d' || argument === '--dir') {
@@ -57,12 +60,19 @@ function parseArguments(argumentsList) {
       options.suggest = true;
       const mode = argumentsList[index + 1];
       if (mode && !mode.startsWith('-')) {
-        if (!['growth', 'ux', 'technical', 'wild'].includes(mode)) throw new Error(`Unknown suggestion mode: ${mode}. Choose growth, ux, technical, or wild.`);
+        if (!isValidSuggestionMode(mode) || mode === 'balanced') throw new Error(`Unknown suggestion mode: ${mode}. Choose growth, ux, technical, wild, ai, or ai-wild.`);
         options.suggestionMode = mode;
         index += 1;
       }
     } else if (argument === '--suggestions') {
       options.suggest = true;
+    } else if (argument === '--recommend') {
+      options.recommend = true;
+    } else if (argument === '--count') {
+      const count = argumentsList[index + 1];
+      if (!count || count.startsWith('-')) throw new Error(`${argument} requires a number from 5 to 20.`);
+      options.recommendCount = Number.parseInt(count, 10);
+      index += 1;
     } else if (argument === '--inspect') {
       options.inspect = true;
     } else if (argument === '-a' || argument === '--ask') {
@@ -120,8 +130,8 @@ async function main() {
     process.stdout.write(`${renderHeader({ name: 'dirgest', directory: options.directory })}\n${renderHistory(history)}\n`);
     return;
   }
-  if (!options.inspect && !options.suggest && !options.ask && !options.review) {
-    process.stderr.write(`${renderError('Choose --inspect, --suggestions, --suggest, --ask, --review, --history, or --clear-history.')}\n\n${help}`);
+  if (!options.inspect && !options.suggest && !options.recommend && !options.ask && !options.review) {
+    process.stderr.write(`${renderError('Choose --inspect, --suggestions, --suggest, --recommend, --ask, --review, --history, or --clear-history.')}\n\n${help}`);
     process.exitCode = 2;
     return;
   }
@@ -144,9 +154,11 @@ async function main() {
   try {
     // A feature review needs the widest possible view of the codebase to judge fit.
     const featureFile = options.review ? await readFeatureFile(options.reviewFile) : null;
-    const project = await inspectProject(options.directory, { crawl: options.inspect || options.crawl || options.review });
+    const project = await inspectProject(options.directory, { crawl: options.inspect || options.crawl || options.review || options.recommend });
     if (options.inspect) {
       process.stdout.write(`${renderInspection(project)}\n`);
+    } else if (options.recommend) {
+      process.stdout.write(`${renderRecommendHeader(project, options.recommendCount)}\n`);
     } else {
       process.stdout.write(`${renderHeader(project)}\n`);
     }
@@ -162,6 +174,36 @@ async function main() {
       if (await promptToSaveAskChoice(process.stdin, process.stdout, { interactive, fit: response.fit })) {
         await writeHistory(project.directory, askHistoryEntry(options.askQuestion, response));
         process.stdout.write('Saved to history. Later suggestions and ask checks will remember this choice.\n');
+      }
+    } else if (options.recommend) {
+      const recommendations = await getRecommendations(project, { mock: options.mock, count: options.recommendCount });
+      if (recommendations.length === 0) {
+        process.stdout.write('\nEvery recommendation in this batch is already excluded. Use --history to review them.\n');
+        return;
+      }
+      process.stdout.write(`${renderRecommendations(recommendations)}\n`);
+      let choice;
+      if (process.stdin.isTTY && process.stdout.isTTY) {
+        try {
+          choice = await browseSuggestions(recommendations, project);
+        } catch (error) {
+          const message = error.message?.includes('native FFI is not available')
+            ? `OpenTUI requires Node 26.4+; current runtime is ${process.version}. Using the basic terminal picker instead.`
+            : 'OpenTUI could not start; using the basic terminal picker instead.';
+          process.stderr.write(`${renderError(message)}\n`);
+          choice = await promptForSelection(process.stdin, process.stdout, { interactive: true, count: recommendations.length });
+        }
+      } else {
+        choice = await promptForSelection(process.stdin, process.stdout, { interactive: false, count: recommendations.length });
+      }
+      if (choice === 'quit') return;
+      const selected = selectedSuggestionEntries(choice, recommendations);
+      if (selected.length > 0) {
+        process.stdout.write(`\n${renderPrompts(selected.map(({ suggestion }) => suggestion), selected.map(({ index }) => index))}\n`);
+        for (const { suggestion } of selected) {
+          await writeHistory(project.directory, recommendHistoryEntry(suggestion));
+        }
+        process.stdout.write(`Saved ${selected.length} recommendation${selected.length === 1 ? '' : 's'} to history.\n`);
       }
     } else {
       const suggestions = withoutExcludedSuggestions(

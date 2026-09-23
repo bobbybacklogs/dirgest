@@ -2,6 +2,7 @@ import type {
   ApiResponse,
   InspectResult,
   SuggestionsResult,
+  RecommendationsResult,
   SuggestionMode,
   AskResult,
   ReviewResult,
@@ -51,6 +52,19 @@ export async function getSuggestions(
   });
 }
 
+export async function getRecommendations(
+  id: string,
+  count = 10,
+  mock = false,
+  signal?: AbortSignal,
+): Promise<RecommendationsResult> {
+  return request<RecommendationsResult>(`/api/v1/projects/${id}/recommendations`, {
+    method: 'POST',
+    body: JSON.stringify({ count, mock }),
+    signal,
+  });
+}
+
 export async function askQuestion(
   id: string,
   question: string,
@@ -82,7 +96,7 @@ export async function recordHistory(
   id: string,
   mode: string,
   title: string,
-  extras?: { verdict?: string; question?: string; rejected?: string; prompt?: string },
+  extras?: { verdict?: string; question?: string; rejected?: string; prompt?: string; source?: string },
 ): Promise<void> {
   await request<{ recorded: boolean }>(`/api/v1/projects/${id}/history`, {
     method: 'POST',

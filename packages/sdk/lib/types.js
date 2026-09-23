@@ -42,7 +42,7 @@
  */
 
 /**
- * @typedef {'balanced' | 'growth' | 'ux' | 'technical' | 'wild'} SuggestionMode
+ * @typedef {'balanced' | 'growth' | 'ux' | 'technical' | 'wild' | 'ai' | 'ai-wild'} SuggestionMode
  */
 
 /**

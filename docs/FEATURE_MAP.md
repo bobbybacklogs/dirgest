@@ -42,7 +42,8 @@ Public exports: `packages/sdk/lib/index.js`. Types: `packages/sdk/lib/types.js` 
 | sdk-crawl | `inspectProject(dir, { crawl: true })` up to 2,000 discovered / 96 sampled / 36k chars + tree | Proven | scanner crawl test |
 | sdk-build-context | `buildProjectContext(dir, files, meta)` from pre-loaded files | Proven | scanner `buildProjectContext` tests |
 | sdk-analysis | Language / framework / type / entry points / categorized deps + summary | Proven | scanner detect* tests |
-| sdk-suggest-mock | `getSuggestions(ctx, { mock: true, mode })` 4–6 titled prompts; modes `balanced\|growth\|ux\|technical\|wild`; honors exclusions | Proven | `packages/sdk/test/suggestions.test.js` |
+| sdk-suggest-mock | `getSuggestions(ctx, { mock: true, mode })` 4–6 titled prompts; modes `balanced\|growth\|ux\|technical\|wild\|ai\|ai-wild`; honors exclusions | Proven | `packages/sdk/test/suggestions.test.js` |
+| sdk-recommend-mock | `getRecommendations(ctx, { mock: true, count })` 5–20 cross-category picks with `mode` tags; honors exclusions | Proven | `packages/sdk/test/recommendations.test.js` |
 | sdk-ask-mock | `getAskResponse(ctx, q, { mock: true })` fit/no-fit via verb heuristic, not a model | Proven | mock ask tests |
 | sdk-review-mock | `readFeatureFile` / `parseFeatureList` / `reviewFeatures(..., { mock: true })` `.md`/`.txt`, 64 KB, 40 features | Proven | `packages/sdk/test/features.test.js` |
 | sdk-history | `.dirgest/history.json` read/write/clear; format for prompts; exclude + ask entries; cap 50 | Proven | `packages/sdk/test/history.test.js` |
@@ -59,7 +60,8 @@ Entry: `packages/cli/bin/dirgest.js`. Thin consumer of the SDK.
 
 | ID | Behavior | Status | Evidence / notes |
 |---|---|---|---|
-| cli-suggest-mock | `dirgest --suggest [mode] --mock --dir <path>` (also `-s`, `--suggestions`) | Proven | CLI spawn tests (`--suggest --mock`, exclusion + crawl) |
+| cli-suggest-mock | `dirgest --suggest [mode] --mock --dir <path>` (also `-s`, `--suggestions`; modes include `ai`, `ai-wild`) | Proven | CLI spawn tests (`--suggest --mock`, exclusion + crawl) |
+| cli-recommend-mock | `dirgest --recommend [--count <5-20>] --mock --dir <path>` (implies crawl; save with `a` or choose) | Proven | CLI spawn test (`--recommend --mock`) |
 | cli-inspect | `dirgest --inspect --dir <path>` (implies crawl) | Proven | `--inspect` spawn test |
 | cli-ask-mock | `dirgest --ask "…" --mock` prints verdict; no history write without TTY confirm | Proven | `--ask --mock` spawn test |
 | cli-review-mock | `dirgest --review file.md --mock` (implies crawl); rejects non `.md`/`.txt` | Proven | `--review` spawn tests |
@@ -88,6 +90,7 @@ Hono app: `packages/api/lib/server.js`. Routes under `/api/v1`. Process: `node p
 | api-inspect-upload | `POST /projects/inspect/upload` `{ files, name? }` | Proven | upload + cache-hit tests |
 | api-get-project | `GET /projects/:id` in-memory cache | Proven | |
 | api-suggest-mock | `POST /projects/:id/suggestions` `{ mode, mock: true }` | Proven | |
+| api-recommend-mock | `POST /projects/:id/recommendations` `{ count?, mock: true }` | Proven | |
 | api-ask-mock | `POST /projects/:id/ask` `{ question, mock: true }` | Proven | |
 | api-review-mock | `POST /projects/:id/review` `{ content, filename }` or `{ features[] }` | Proven | |
 | api-history | `GET` / `POST` / `DELETE /projects/:id/history` | Proven | writes via SDK to `context.directory` |

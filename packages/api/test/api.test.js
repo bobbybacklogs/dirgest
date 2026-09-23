@@ -159,6 +159,25 @@ test('POST /projects/:id/suggestions returns 404 for unknown project', async () 
   assert.equal(res.status, 404);
 });
 
+test('POST /projects/:id/recommendations generates mock cross-category recommendations', async () => {
+  const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'a.js', content: '{}' }], name: 'a' });
+  const { data: { id } } = await insp.json();
+  const res = await req('POST', `/api/v1/projects/${id}/recommendations`, { count: 10, mock: true });
+  assert.equal(res.status, 200);
+  const { data } = await res.json();
+  assert.equal(data.count, 10);
+  assert.ok(Array.isArray(data.recommendations));
+  assert.equal(data.recommendations.length, 10);
+  assert.ok(data.recommendations.some((recommendation) => recommendation.mode === 'ai'));
+});
+
+test('POST /projects/:id/recommendations rejects invalid count', async () => {
+  const insp = await req('POST', '/api/v1/projects/inspect/upload', { files: [{ path: 'a.js', content: '{}' }], name: 'a' });
+  const { data: { id } } = await insp.json();
+  const res = await req('POST', `/api/v1/projects/${id}/recommendations`, { count: 3, mock: true });
+  assert.equal(res.status, 400);
+});
+
 // --- Ask ---
 
 test('POST /projects/:id/ask evaluates a feature idea', async () => {

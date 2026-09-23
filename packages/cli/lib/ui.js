@@ -41,6 +41,13 @@ export function renderInspection(project) {
 
   return lines.join('\n');
 }
+export function renderRecommendHeader(project, count) {
+  return `\n${color(ANSI.bold + ANSI.cyan, project.name)} ${color(ANSI.dim, '|')} ${color(ANSI.dim, project.directory)}\n${color(ANSI.dim, `Top ${count} recommendations from a broad directory crawl across every suggestion category`)}`;
+}
+export function renderRecommendations(recommendations) {
+  const count = recommendations.length;
+  return `\n${recommendations.map((recommendation, index) => `  ${color(ANSI.green, String(index + 1).padStart(2, ' '))}  ${color(ANSI.bold, recommendation.title)} ${color(ANSI.dim, `(${recommendation.mode})`)}`).join('\n')}\n\n${color(ANSI.dim, selectionInstructions(count))}`;
+}
 export function renderSuggestions(suggestions) {
   const count = suggestions.length;
   return `\n${suggestions.map((suggestion, index) => `  ${color(ANSI.green, String(index + 1).padStart(2, ' '))}  ${color(ANSI.bold, suggestion.title)}`).join('\n')}\n\n${color(ANSI.dim, selectionInstructions(count))}`;

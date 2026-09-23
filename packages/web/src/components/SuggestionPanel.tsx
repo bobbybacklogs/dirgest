@@ -1,17 +1,18 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { Suggestion, SuggestionMode } from '../types';
+import type { Suggestion, SuggestionMode, Recommendation } from '../types';
 
 interface Props {
-  suggestions: Suggestion[];
+  suggestions: Array<Suggestion | Recommendation>;
   activeMode: SuggestionMode;
   mock: boolean;
   generating: boolean;
   savedTitles: Set<string>;
   onGenerate: (mode: SuggestionMode) => void;
-  onRecord: (mode: string, title: string, extras?: { verdict?: string; prompt?: string }) => void;
+  onRecommend: () => void;
+  onRecord: (mode: string, title: string, extras?: { verdict?: string; prompt?: string; source?: string }) => void;
 }
 
-const MODES: SuggestionMode[] = ['balanced', 'growth', 'ux', 'technical', 'wild'];
+const MODES: SuggestionMode[] = ['balanced', 'growth', 'ux', 'technical', 'wild', 'ai', 'ai-wild'];
 
 export function SuggestionPanel({
   suggestions,
@@ -20,6 +21,7 @@ export function SuggestionPanel({
   generating,
   savedTitles,
   onGenerate,
+  onRecommend,
   onRecord,
 }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -56,6 +58,9 @@ export function SuggestionPanel({
         <button className="btn btn-sm" disabled={generating} onClick={() => onGenerate(activeMode)}>
           Generate {activeMode}
         </button>
+        <button className="btn btn-sm" disabled={generating} onClick={onRecommend}>
+          Recommend top 10
+        </button>
       </div>
       {suggestions.length > 0 && (
         <p className="card-subtitle">
@@ -73,6 +78,7 @@ export function SuggestionPanel({
 
       {suggestions.map((s, i) => {
         const recorded = savedTitles.has(s.title.trim().toLowerCase());
+        const itemMode = 'mode' in s && s.mode ? s.mode : activeMode;
         return (
           <div
             key={`${s.title}-${i}`}
@@ -81,6 +87,7 @@ export function SuggestionPanel({
           >
             <div className="suggestion-title">
               {s.title}
+              {'mode' in s && s.mode ? <span className="chip">{s.mode}</span> : null}
               {recorded && <span className="chip">Saved</span>}
             </div>
             {expanded === i && (
@@ -96,13 +103,16 @@ export function SuggestionPanel({
                   <button
                     className="btn btn-sm"
                     disabled={recorded}
-                    onClick={() => onRecord(activeMode, s.title, { prompt: s.prompt })}
+                    onClick={() => onRecord(itemMode, s.title, {
+                      prompt: s.prompt,
+                      ...('mode' in s && s.mode ? { source: 'recommend' } : {}),
+                    })}
                   >
                     {recorded ? 'Already saved' : 'Save prompt'}
                   </button>
                   <button
                     className="btn btn-sm"
-                    onClick={() => onRecord(activeMode, s.title, { verdict: 'excluded' })}
+                    onClick={() => onRecord(itemMode, s.title, { verdict: 'excluded' })}
                   >
                     Exclude
                   </button>
