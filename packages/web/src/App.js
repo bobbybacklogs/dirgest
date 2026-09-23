@@ -131,6 +131,31 @@ export function App() {
                 setLoading(null);
         }
     }, [project, showToast, mock]);
+    const handleGenerateRecommendations = useCallback(async () => {
+        if (!project)
+            return;
+        const seq = ++generateSeq.current;
+        generateAbort.current?.abort();
+        const controller = new AbortController();
+        generateAbort.current = controller;
+        setTab('suggest');
+        setLoading(mock ? 'Generating mock recommendations…' : 'Generating cross-category recommendations…');
+        try {
+            const result = await api.getRecommendations(project.id, 10, mock, controller.signal);
+            if (seq !== generateSeq.current)
+                return;
+            setSuggestions(result.recommendations);
+        }
+        catch (err) {
+            if (seq !== generateSeq.current || isAbortError(err))
+                return;
+            showToast(err instanceof Error ? err.message : 'Failed to generate recommendations');
+        }
+        finally {
+            if (seq === generateSeq.current)
+                setLoading(null);
+        }
+    }, [project, showToast, mock]);
     const handleAsk = useCallback(async (question) => {
         if (!project)
             return;
@@ -208,5 +233,5 @@ export function App() {
         setHistory([]);
         setTab('understand');
     }, []);
-    return (_jsxs("div", { className: "app-shell", children: [_jsxs("header", { className: "topbar", children: [_jsxs("div", { className: "brand", children: [_jsx("span", { className: "brand-mark", children: "dg" }), _jsxs("div", { children: [_jsx("strong", { children: "Dirgest" }), _jsx("span", { className: "brand-sub", children: project ? project.context.name : 'Project briefing' })] })] }), _jsxs("div", { className: "topbar-actions", children: [_jsxs("div", { className: "source-switch", role: "group", "aria-label": "Suggestion source", children: [_jsx("button", { type: "button", className: !mock ? 'active' : '', onClick: () => setMock(false), children: "Live" }), _jsx("button", { type: "button", className: mock ? 'active' : '', onClick: () => setMock(true), children: "Mock" })] }), project && (_jsx("button", { className: "btn btn-sm", onClick: handleReset, children: "New project" }))] })] }), loading && (_jsxs("div", { className: "status-bar", children: [_jsx("div", { className: "spinner" }), loading] })), _jsx("main", { className: "app", children: !project ? (_jsx(ProjectUpload, { onUpload: handleUpload })) : (_jsxs(_Fragment, { children: [_jsx("nav", { className: "tabs", "aria-label": "Workspace", children: TABS.map((item, index) => (_jsxs("button", { className: `tab ${tab === item.id ? 'active' : ''}`, title: `Alt+${index + 1}`, onClick: () => openTab(item.id), children: [_jsx("span", { className: "tab-index", children: index + 1 }), item.label, item.id === 'saved' && savedCount > 0 && _jsx("span", { className: "tab-count", children: savedCount }), item.id === 'suggest' && suggestions.length > 0 && _jsx("span", { className: "tab-count", children: suggestions.length }), item.id === 'history' && history.length > 0 && _jsx("span", { className: "tab-count", children: history.length })] }, item.id))) }), tab === 'understand' && (_jsx(ProjectView, { context: project.context, history: history, review: review, suggestionCount: suggestions.length, generating: Boolean(loading), onGenerateSuggestions: handleGenerateSuggestions, onNavigate: openTab })), tab === 'suggest' && (_jsx(SuggestionPanel, { suggestions: suggestions, activeMode: activeMode, mock: mock, generating: Boolean(loading), savedTitles: savedTitles, onGenerate: handleGenerateSuggestions, onRecord: handleRecordSelection })), tab === 'ask' && (_jsx(AskPanel, { response: askResponse, onAsk: handleAsk, onSave: handleSaveAsk })), tab === 'review' && (_jsx(ReviewPanel, { review: review, onReview: handleReviewFeatures })), tab === 'saved' && (_jsx(SavedPromptsPanel, { history: history })), tab === 'history' && (_jsx(HistoryPanel, { history: history, onClear: handleClearHistory }))] })) }), toast && _jsx("div", { className: "toast", children: toast })] }));
+    return (_jsxs("div", { className: "app-shell", children: [_jsxs("header", { className: "topbar", children: [_jsxs("div", { className: "brand", children: [_jsx("span", { className: "brand-mark", children: "dg" }), _jsxs("div", { children: [_jsx("strong", { children: "Dirgest" }), _jsx("span", { className: "brand-sub", children: project ? project.context.name : 'Project briefing' })] })] }), _jsxs("div", { className: "topbar-actions", children: [_jsxs("div", { className: "source-switch", role: "group", "aria-label": "Suggestion source", children: [_jsx("button", { type: "button", className: !mock ? 'active' : '', onClick: () => setMock(false), children: "Live" }), _jsx("button", { type: "button", className: mock ? 'active' : '', onClick: () => setMock(true), children: "Mock" })] }), project && (_jsx("button", { className: "btn btn-sm", onClick: handleReset, children: "New project" }))] })] }), loading && (_jsxs("div", { className: "status-bar", children: [_jsx("div", { className: "spinner" }), loading] })), _jsx("main", { className: "app", children: !project ? (_jsx(ProjectUpload, { onUpload: handleUpload })) : (_jsxs(_Fragment, { children: [_jsx("nav", { className: "tabs", "aria-label": "Workspace", children: TABS.map((item, index) => (_jsxs("button", { className: `tab ${tab === item.id ? 'active' : ''}`, title: `Alt+${index + 1}`, onClick: () => openTab(item.id), children: [_jsx("span", { className: "tab-index", children: index + 1 }), item.label, item.id === 'saved' && savedCount > 0 && _jsx("span", { className: "tab-count", children: savedCount }), item.id === 'suggest' && suggestions.length > 0 && _jsx("span", { className: "tab-count", children: suggestions.length }), item.id === 'history' && history.length > 0 && _jsx("span", { className: "tab-count", children: history.length })] }, item.id))) }), tab === 'understand' && (_jsx(ProjectView, { context: project.context, history: history, review: review, suggestionCount: suggestions.length, generating: Boolean(loading), onGenerateSuggestions: handleGenerateSuggestions, onNavigate: openTab })), tab === 'suggest' && (_jsx(SuggestionPanel, { suggestions: suggestions, activeMode: activeMode, mock: mock, generating: Boolean(loading), savedTitles: savedTitles, onGenerate: handleGenerateSuggestions, onRecommend: handleGenerateRecommendations, onRecord: handleRecordSelection })), tab === 'ask' && (_jsx(AskPanel, { response: askResponse, onAsk: handleAsk, onSave: handleSaveAsk })), tab === 'review' && (_jsx(ReviewPanel, { review: review, onReview: handleReviewFeatures })), tab === 'saved' && (_jsx(SavedPromptsPanel, { history: history })), tab === 'history' && (_jsx(HistoryPanel, { history: history, onClear: handleClearHistory }))] })) }), toast && _jsx("div", { className: "toast", children: toast })] }));
 }

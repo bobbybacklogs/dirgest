@@ -3,7 +3,7 @@ import test from 'node:test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath, titleFromPrompt, askHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions, savedPromptEntries, formatSavedPrompts } from '@dirgest/sdk/lib/history.js';
+import { readHistory, writeHistory, clearHistory, formatHistoryForPrompt, historyPath, titleFromPrompt, askHistoryEntry, recommendHistoryEntry, excludeHistoryEntry, withoutExcludedSuggestions, savedPromptEntries, formatSavedPrompts } from '@dirgest/sdk/lib/history.js';
 
 let tempDir;
 
@@ -136,6 +136,20 @@ test('withoutExcludedSuggestions drops matching titles case-insensitively', () =
   ];
   const filtered = withoutExcludedSuggestions(suggestions, [excludeHistoryEntry('balanced', 'project health summary')]);
   assert.deepEqual(filtered.map((suggestion) => suggestion.title), ['Guided First Run']);
+});
+
+test('recommendHistoryEntry records kept recommendations as first-class history', () => {
+  const entry = recommendHistoryEntry({
+    mode: 'ai',
+    title: 'Semantic Search Layer',
+    prompt: 'Implement semantic search layer for the app with tests and existing architecture preserved here.',
+  });
+  assert.deepEqual(entry, {
+    mode: 'ai',
+    title: 'Semantic Search Layer',
+    prompt: 'Implement semantic search layer for the app with tests and existing architecture preserved here.',
+    source: 'recommend',
+  });
 });
 
 test('formatHistoryForPrompt lists excluded ideas separately', () => {

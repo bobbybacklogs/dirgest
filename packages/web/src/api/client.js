@@ -27,6 +27,13 @@ export async function getSuggestions(id, mode, mock = false, signal) {
         signal,
     });
 }
+export async function getRecommendations(id, count = 10, mock = false, signal) {
+    return request(`/api/v1/projects/${id}/recommendations`, {
+        method: 'POST',
+        body: JSON.stringify({ count, mock }),
+        signal,
+    });
+}
 export async function askQuestion(id, question, mock = false) {
     return request(`/api/v1/projects/${id}/ask`, {
         method: 'POST',

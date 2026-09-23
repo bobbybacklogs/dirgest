@@ -32,13 +32,13 @@ test('update check prompts and restarts only when npm has a newer version', asyn
     input,
     output,
     env: {},
-    fetchImpl: async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '0.3.0' } }) }),
-    prompt: async (_input, _output, version) => { prompted = true; return version === '0.3.0'; },
+    fetchImpl: async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '9.9.9' } }) }),
+    prompt: async (_input, _output, version) => { prompted = true; return version === '9.9.9'; },
     update: (version) => { updatedVersion = version; return { restarted: true, status: 0 }; },
   });
 
   assert.equal(prompted, true);
-  assert.equal(updatedVersion, '0.3.0');
+  assert.equal(updatedVersion, '9.9.9');
   assert.deepEqual(result, { restarted: true, status: 0 });
 });
 
@@ -52,6 +52,21 @@ test('update check is skipped for non-interactive terminals', async () => {
 
   assert.equal(result, null);
   assert.equal(fetched, false);
+});
+
+test('--recommend --mock crawls and lists cross-category recommendations', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'dirgest-cli-recommend-'));
+  await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: 'recommend-test' }));
+  await writeFile(path.join(directory, 'index.js'), 'export const ready = true;');
+  const result = spawnSync(process.execPath, ['bin/dirgest.js', '--recommend', '--mock', '--dir', directory], {
+    cwd: packageDirectory,
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Top 10 recommendations from a broad directory crawl/);
+  assert.match(result.stdout, /\(ai\)/);
+  assert.match(result.stdout, /Run in an interactive terminal to choose/);
 });
 
 test('--suggest --mock omits titles stored as exclusions in project history', async () => {

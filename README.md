@@ -33,7 +33,9 @@ That's it. Dirgest samples your project, works out what it actually is, and retu
 
 ```sh
 dirgest --suggest                      # 4-6 balanced ideas
-dirgest --suggest growth               # or: ux · technical · wild
+dirgest --suggest growth               # or: ux · technical · wild · ai · ai-wild
+dirgest --recommend                    # crawl, then top 10 ideas across every category
+dirgest --recommend --count 15         # 5-20 recommendations (default 10)
 dirgest --ask "add a dark mode toggle" # does this idea fit? save to remember
 dirgest --review roadmap.md            # score a whole feature list
 dirgest --suggest --crawl              # widen the context first
@@ -42,7 +44,8 @@ dirgest --history                      # what you've picked before
 
 | Flag | Does |
 |---|---|
-| `-s, --suggest [mode]` | `growth` · `ux` · `technical` · `wild`, or omit for balanced |
+| `-s, --suggest [mode]` | `growth` · `ux` · `technical` · `wild` · `ai` · `ai-wild`, or omit for balanced |
+| `--recommend` | Crawl the repo and surface 5–20 top ideas across every category (default 10; use `--count`) |
 | `-a, --ask <question>` | Fit / no-fit verdict, with reasoning and a prompt or an alternative. In a real terminal, you can save the idea (or the recommended alternative) to history |
 | `-r, --review <file>` | Review a `.md` / `.txt` feature list against the codebase |
 | `-d, --dir <path>` | Target a different project (defaults to cwd) |

@@ -106,6 +106,15 @@ export function askHistoryEntry(question, response) {
   };
 }
 
+export function recommendHistoryEntry(recommendation) {
+  return {
+    mode: recommendation.mode,
+    title: recommendation.title,
+    prompt: recommendation.prompt,
+    source: 'recommend',
+  };
+}
+
 function formatHistoryLine(entry) {
   const date = new Date(entry.timestamp).toISOString().slice(0, 10);
   if (entry.verdict === 'misfit' && entry.rejected) {
@@ -116,6 +125,9 @@ function formatHistoryLine(entry) {
   }
   if (isExcludedEntry(entry)) {
     return `- [${date}] (${entry.mode || 'balanced'}) ${entry.title}`;
+  }
+  if (entry.source === 'recommend') {
+    return `- [${date}] (recommend · ${entry.mode || 'balanced'}) ${entry.title}`;
   }
   return `- [${date}] (${entry.mode || 'balanced'}) ${entry.title}`;
 }

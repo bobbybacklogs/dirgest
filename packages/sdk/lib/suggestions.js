@@ -4,13 +4,21 @@ import { buildCooldownFromConfig, defaultProviders, isMaskedSecret, MemoryKeySto
 import { readHistory, formatHistoryForPrompt, withoutExcludedSuggestions } from './history.js';
 
 const FEATURE_SCHEMA = { type: 'object', additionalProperties: false, required: ['suggestions'], properties: { suggestions: { type: 'array', minItems: 4, maxItems: 6, items: { type: 'object', additionalProperties: false, required: ['title', 'prompt'], properties: { title: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 &/-]{2,59}$' }, prompt: { type: 'string', minLength: 80 } } } } } };
+export const SUGGESTION_MODES = ['balanced', 'growth', 'ux', 'technical', 'wild', 'ai', 'ai-wild'];
+
 const MODE_INSTRUCTIONS = {
   balanced: 'Balance practical product-next improvements across the project\'s most important user and engineering needs.',
   growth: 'Prioritize activation, retention, and monetization opportunities that fit the existing project.',
   ux: 'Prioritize reducing user friction and improving the end-to-end experience.',
   technical: 'Prioritize architecture, technical debt, maintainability, performance, and reliability improvements.',
-  wild: 'Explore genuinely novel but feasible adjacent capabilities, while staying grounded in the supplied project context.'
+  wild: 'Explore genuinely novel but feasible adjacent capabilities, while staying grounded in the supplied project context.',
+  ai: 'Prioritize practical AI enhancements that could benefit from inference APIs, embeddings, classification, RAG pipelines, or tool-using agents. Stay provider-neutral — do not assume OpenAI, Anthropic, Groq, or any single vendor.',
+  'ai-wild': 'Explore bold, speculative AI-native capabilities (autonomous workflows, multimodal understanding, adaptive agents) while remaining grounded in the supplied project context. Stay provider-neutral.',
 };
+
+export function isValidSuggestionMode(mode) {
+  return Object.hasOwn(MODE_INSTRUCTIONS, mode);
+}
 
 function systemPrompt(mode) {
   return `You are a senior product engineer. The input includes a project analysis summary and a bounded sample of the project's source files. Use the project analysis as your primary reference for the project's type, language, framework, dependencies, and entry points. Cross-reference it with the source sample to confirm your understanding. Before generating any suggestions, determine: (1) what the project is (its purpose, category, and audience), (2) its tech stack, architecture, and conventions, and (3) what it is NOT — do not confuse individual library imports or SDK references with the project's overall identity. For example, a project using Firebase SDKs is not "a Firebase document"; it is whatever the codebase actually builds. Generate exactly 4 to 6 feasible, project-aware feature ideas grounded in that accurate understanding. ${MODE_INSTRUCTIONS[mode]} Each title must contain exactly 3 or 4 words. Each prompt must be a complete, actionable coding prompt that describes scope, relevant existing context, expected behavior, edge cases, and validation. Do not claim integrations or persistence that are absent from the context. Do not misidentify the project's type or category based on individual dependencies. Return only JSON matching the schema.`;
@@ -26,7 +34,9 @@ function mockSuggestions(project, mode) {
     growth: ['Guided Activation Checklist', 'Returning User Nudges', 'Value Milestone Tracking', 'Upgrade Readiness Signals', 'Referral Sharing Flow'],
     ux: ['Progressive Setup Guidance', 'Clearer Recovery Actions', 'Faster Common Workflows', 'Accessible Status Feedback', 'Contextual Empty States'],
     technical: ['Resilient Error Boundaries', 'Modular Configuration Layer', 'Automated Dependency Audits', 'Reliable Task Retries', 'Performance Regression Checks'],
-    wild: ['Natural Language Workflows', 'Project Insight Timeline', 'Adaptive Workspace Assistant', 'Collaborative Review Rooms', 'Predictive Next Actions']
+    wild: ['Natural Language Workflows', 'Project Insight Timeline', 'Adaptive Workspace Assistant', 'Collaborative Review Rooms', 'Predictive Next Actions'],
+    ai: ['Semantic Search Layer', 'Document Classification API', 'Inference Prompt Cache', 'Agent Tool Routing', 'Embedding Similarity Index'],
+    'ai-wild': ['Autonomous Task Agents', 'Multimodal Content Understanding', 'Self Improving Prompt Loops', 'Cross Repo Knowledge Graph', 'Adaptive Inference Routing'],
   };
   return titles[mode].map((title) => ({ title, prompt: makePrompt(title, project) }));
 }
@@ -48,7 +58,7 @@ export function validateSuggestions(payload) {
   });
 }
 
-function parseContent(content) {
+export function parseContent(content) {
   if (typeof content !== 'string') throw new Error('Model returned no text content.');
   try { return JSON.parse(content); } catch { throw new Error('Model returned invalid JSON; try again or use --mock.'); }
 }
@@ -320,7 +330,7 @@ async function loadHistory(project) {
 }
 
 export async function getSuggestions(project, { mock = false, mode = 'balanced', environment = process.env } = {}) {
-  if (!Object.hasOwn(MODE_INSTRUCTIONS, mode)) throw new Error(`Unknown suggestion mode: ${mode}.`);
+  if (!isValidSuggestionMode(mode)) throw new Error(`Unknown suggestion mode: ${mode}.`);
   const history = await loadHistory(project);
   if (mock) return withoutExcludedSuggestions(mockSuggestions(project, mode), history);
   const historyContext = formatHistoryForPrompt(history);

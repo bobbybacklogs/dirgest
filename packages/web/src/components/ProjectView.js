@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useMemo, useState } from 'react';
 import { excludedEntries, savedPromptEntries } from '../lib/history';
-const MODES = ['balanced', 'growth', 'ux', 'technical', 'wild'];
+const MODES = ['balanced', 'growth', 'ux', 'technical', 'wild', 'ai', 'ai-wild'];
 function Field({ label, value }) {
     return (_jsxs("div", { className: "context-field", children: [_jsx("div", { className: "context-label", children: label }), _jsx("div", { className: `context-value ${!value ? 'empty' : ''}`, children: value || 'Not detected' })] }));
 }

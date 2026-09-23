@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { buildProjectContext, inspectProject, getSuggestions, getAskResponse, parseFeatureList, reviewFeatures, readHistory, clearHistory, writeHistory, FEATURE_FILE_EXTENSIONS, MAX_FEATURE_FILE_BYTES, MAX_FEATURES } from '@dirgest/sdk';
+import { buildProjectContext, inspectProject, getSuggestions, getRecommendations, getAskResponse, parseFeatureList, reviewFeatures, readHistory, clearHistory, writeHistory, FEATURE_FILE_EXTENSIONS, MAX_FEATURE_FILE_BYTES, MAX_FEATURES, isValidSuggestionMode, normalizeRecommendationCount } from '@dirgest/sdk';
 
 const API_VERSION = 'v1';
 
@@ -12,7 +12,7 @@ function fail(code, message, status = 400) {
 }
 
 function validateMode(mode) {
-  return ['balanced', 'growth', 'ux', 'technical', 'wild'].includes(mode);
+  return isValidSuggestionMode(mode);
 }
 
 function extensionOf(filename) {
@@ -71,10 +71,26 @@ export function createRoutes(cache, jobs) {
     const context = cache.get(id);
     if (!context) return fail('not-found', `Project ${id} not found. Inspect it first.`, 404);
     const { mode = 'balanced', mock = false } = await c.req.json().catch(() => ({}));
-    if (!validateMode(mode)) return fail('bad-request', `Invalid mode "${mode}". Choose from: balanced, growth, ux, technical, wild.`);
+    if (!validateMode(mode)) return fail('bad-request', `Invalid mode "${mode}". Choose from: balanced, growth, ux, technical, wild, ai, ai-wild.`);
     const environment = Object.fromEntries(Object.entries(process.env).filter(([, v]) => typeof v === 'string'));
     const suggestions = await getSuggestions(context, { mode, mock, environment });
     return ok({ id, mode, suggestions });
+  });
+
+  // POST /projects/:id/recommendations — generate cross-category recommendations
+  app.post('/projects/:id/recommendations', async (c) => {
+    const id = c.req.param('id');
+    const context = cache.get(id);
+    if (!context) return fail('not-found', `Project ${id} not found. Inspect it first.`, 404);
+    const { count = 10, mock = false } = await c.req.json().catch(() => ({}));
+    try {
+      normalizeRecommendationCount(count);
+    } catch (error) {
+      return fail('bad-request', error.message);
+    }
+    const environment = Object.fromEntries(Object.entries(process.env).filter(([, v]) => typeof v === 'string'));
+    const recommendations = await getRecommendations(context, { count, mock, environment });
+    return ok({ id, count, recommendations });
   });
 
   // POST /projects/:id/ask — evaluate a feature idea
@@ -136,13 +152,14 @@ export function createRoutes(cache, jobs) {
     const id = c.req.param('id');
     const context = cache.get(id);
     if (!context) return fail('not-found', `Project ${id} not found. Inspect it first.`, 404);
-    const { mode, title, verdict, question, rejected, prompt } = await c.req.json();
+    const { mode, title, verdict, question, rejected, prompt, source } = await c.req.json();
     if (!title || typeof title !== 'string') return fail('bad-request', 'A "title" string is required.');
     const entry = { mode: mode || 'balanced', title };
     if (verdict === 'fit' || verdict === 'misfit' || verdict === 'excluded') entry.verdict = verdict;
     if (typeof question === 'string' && question.trim()) entry.question = question.trim();
     if (typeof rejected === 'string' && rejected.trim()) entry.rejected = rejected.trim();
     if (typeof prompt === 'string' && prompt.trim()) entry.prompt = prompt.trim();
+    if (source === 'recommend') entry.source = 'recommend';
     await writeHistory(context.directory, entry);
     return ok({ id, recorded: true });
   });

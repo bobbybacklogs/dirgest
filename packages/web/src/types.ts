@@ -38,7 +38,11 @@ export interface Suggestion {
   prompt: string;
 }
 
-export type SuggestionMode = 'balanced' | 'growth' | 'ux' | 'technical' | 'wild';
+export interface Recommendation extends Suggestion {
+  mode: SuggestionMode;
+}
+
+export type SuggestionMode = 'balanced' | 'growth' | 'ux' | 'technical' | 'wild' | 'ai' | 'ai-wild';
 
 export interface AskResponseFit {
   fit: true;
@@ -102,6 +106,12 @@ export interface SuggestionsResult {
   id: string;
   mode: SuggestionMode;
   suggestions: Suggestion[];
+}
+
+export interface RecommendationsResult {
+  id: string;
+  count: number;
+  recommendations: Recommendation[];
 }
 
 export interface AskResult {
